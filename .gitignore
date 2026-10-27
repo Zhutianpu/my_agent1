@@ -1,5 +1,6 @@
 # 密钥与本地状态
 config.json
+mcp_servers.json
 .env
 run.log
 memory/

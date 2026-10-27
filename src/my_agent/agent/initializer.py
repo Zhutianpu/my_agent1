@@ -53,6 +53,12 @@ def initialize_agent(bot, agent_id: str = None, workspace_dir=None) -> Agent:
     # 阶段 8：技能系统——扫 workspaces/<agent_id>/skills/，出描述清单进 prompt
     skill_manager = SkillManager(ws / "skills").refresh()
 
+    # 阶段 9：MCP——读 mcp_servers.json，远程工具包成 BaseTool 注册进
+    # ToolManager（它一行不改，模型分不清本地/远程）。挂在装配间 = 每次
+    # 重新装配（#reset）都会重连 server，工具列表永远最新。
+    from .tools.mcp import start_mcp_servers
+    start_mcp_servers(TOOLS)
+
     # --- 编译 ---
     system_prompt = build_system_prompt(
         tools=TOOLS.schemas(),

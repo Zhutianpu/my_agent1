@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "time": {
+      "command": "python",
+      "args": ["scripts/mcp_time_server.py"],
+      "risk": "read"
+    }
+  }
+}

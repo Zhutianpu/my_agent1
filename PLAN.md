@@ -109,7 +109,7 @@ my-agent/
 - [ ] **真机验收**：聊几轮 → 退出重开 → 历史还在；CONVERSATION_MAX_MESSAGES=8
       聊十几轮 → memory/日期.md 出现；#dream → MEMORY.md 更新；问"我之前说过X" → 它用 memory_search
 
-### 阶段 8：skills ✅ 2026-10-27（测试 58 绿，待真机验收）
+### 阶段 8：skills ✅ 2026-10-27（测试全绿，真机验收过：写周报时自动读 SKILL.md 并按格式输出）
 > 对齐 `agent/skills/`（loader 361 + manager 519 → 简化到 ~120 行）
 
 - [x] loader.py：扫 `skills/<技能名>/SKILL.md`、解析 frontmatter（手写 --- 围栏解析，
@@ -117,18 +117,26 @@ my-agent/
 - [x] manager.py：出描述清单进 prompt（builder 最后坑位兑现）；
       正文不进 prompt——纪律写死在技能段："技能不是工具，唯一用法是 read_file 读 SKILL.md"
 - [x] 预置演示技能 workspaces/default/skills/weekly-report/
-- [ ] **真机验收**：#reset 后说"帮我写周报" → agent 主动 read_file 读 SKILL.md 并照格式输出
+- [x] **真机验收**："帮我写周报" → agent 主动 read_file 读 SKILL.md 并按三段式输出 ✅
+      （还超额完成：主动去 git log 核实本周实际工作；触发了权限闸 y/a 流程）
+- [x] 附带真机大修复：蒸馏时机挪到循环前 + 摘要注回活上下文
+      （对齐 CowAgent context_summary_callback，修复"周报失忆"事件）
 
-### 阶段 9：MCP（CowAgent 版）
-> 核心洞察：McpTool 适配器 33 行——远程工具包成 BaseTool，模型分不清本地/远程
+### 阶段 9：MCP（CowAgent 版）✅ 2026-10-27（测试 66 绿，待真机验收）
+> 核心洞察兑现：McpTool 适配器——远程工具包成 BaseTool，模型分不清本地/远程
 
-- [ ] mcp_client.py：JSON-RPC stdio 客户端（myself step11 底子，对齐 CowAgent 签名）
-- [ ] mcp_tool.py：适配器（`mcp_<server>_` 前缀防撞名）
-- [ ] 挂载：initializer 里读 mcp_servers.json → 握手 → 注册进 ToolManager（它一行不改）
-- [ ] 安全：命令白名单（npx/uvx/node/python）
-- [ ] 不做：SSE/HTTP 传输、OAuth、tool_retrieval 动态加载
-- [ ] **验收**：配 time server（myself/mcp_servers/mcp_server_time.py 现成），工具自动出现
-- [ ] 后续接入：filesystem / fetch / sequential-thinking（官方 server）
+- [x] mcp_client.py：JSON-RPC 2.0 stdio 客户端（换行分隔 JSON；后台线程+队列
+      做跨平台超时读；握手 initialize→notifications/initialized；id 配对、
+      通知跳过、过期 id 跳过；一把锁串行化管道）
+- [x] mcp_tool.py：适配器（`mcp_<server>_` 前缀防撞名，远程调用用原名）；
+      注册的是实例不是类（ToolManager.register 升级兼容两种）
+- [x] 挂载：initializer 读 mcp_servers.json（mcpServers 格式）→ 握手 → 注册；
+      单 server 挂了不拖累别人；#reset 重连；app 退出 shutdown_all
+- [x] 安全：命令白名单（python/node/npx/uvx/uv）+ 敏感环境变量不透传 +
+      server 级 risk 配置（默认 write 弹窗，read 放行）
+- [x] 零依赖验收 server：scripts/mcp_time_server.py（手写协议，不依赖 mcp SDK）
+- [ ] 不做：SSE/HTTP 传输、OAuth、tool_retrieval 动态加载、分页游标
+- [ ] **真机验收**：配好 mcp_servers.json → 问"现在几点" → mcp_time_ 工具出现
 
 ### 阶段 10：简约 Web console
 > 对齐 `channel/web` 的位置，技术栈换 FastAPI + SSE（比 web.py 现代）

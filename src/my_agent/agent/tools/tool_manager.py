@@ -18,9 +18,13 @@ class ToolManager:
     def __init__(self):
         self._tools = {}
 
-    def register(self, tool_cls):
-        assert issubclass(tool_cls, BaseTool)
-        self._tools[tool_cls.name] = tool_cls()
+    def register(self, tool):
+        """登记工具。内建工具传类（这里实例化）；MCP 工具传实例
+        （每个实例的名字/说明书来自远程 schema，不能走类）。"""
+        if isinstance(tool, type):
+            assert issubclass(tool, BaseTool)
+            tool = tool()
+        self._tools[tool.name] = tool
 
     def get(self, name):
         return self._tools.get(name)
