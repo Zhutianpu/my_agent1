@@ -28,7 +28,7 @@ def build_system_prompt(
     runtime_info: Optional[Dict[str, Any]] = None,
     identity_fallback: str = "",
     memory_digest: str = "",          # 阶段 7：最近日记摘要
-    # 阶段 8 坑位：skill_manager=None
+    skill_manager=None,               # 阶段 8：技能清单（有 build_skills_prompt() 就行）
 ) -> str:
     """分段编译 system prompt。每段由原料是否存在决定（存在即编译）。"""
     sections = []
@@ -50,7 +50,11 @@ def build_system_prompt(
     if memory_digest:
         sections.append(_memory_section(memory_digest))
 
-    # 阶段 8：技能清单段插在这里（skill_manager）
+    # 3.5. 技能段（阶段 8）：描述清单 + 使用纪律（正文不进 prompt，模型按需读）
+    if skill_manager:
+        skills_prompt = skill_manager.build_skills_prompt()
+        if skills_prompt:
+            sections.append(_skills_section(skills_prompt))
 
     # 4. 上下文文件段（AGENT.md 在这里变成"我是谁"）
     if context_files:
@@ -89,6 +93,7 @@ def _workspace_section(workspace_dir: str, cwd: str = "") -> str:
         "- `USER.md`：用户的基本信息（了解到的静态信息写进去）",
         "- `MEMORY.md`：长期记忆（重要的事写下来，不要只在心里记）",
         "- `memory/`：每日记录目录",
+        "- `skills/`：技能目录（每个子目录一份 SKILL.md 说明书）",
     ]
     if cwd:
         lines += [
@@ -107,6 +112,30 @@ def _memory_section(digest: str) -> str:
         "重要但已过时的内容会在 #dream 后沉淀进 MEMORY.md）：",
         "",
         digest,
+    ])
+
+
+def _skills_section(skills_prompt: str) -> str:
+    """技能段：描述清单 + 使用纪律（对齐 CowAgent _build_skills_section 的中文版）。
+
+    纪律必须写死在 prompt 里：技能不是工具、不能调，唯一用法是 read_file
+    读 SKILL.md 后照做——模型不看正文就会瞎猜技能内容。"""
+    return "\n".join([
+        "## 🧩 技能系统（mandatory）",
+        "",
+        "在回复之前：扫描下方每个技能的描述。",
+        "",
+        "- 如果有技能的描述与用户需求匹配：用 `read_file` 读取其路径下的 SKILL.md，",
+        "  然后严格遵循文件中的指令。有匹配的技能时优先使用技能",
+        "- 多个技能都适用时选最匹配的一个，读完再做",
+        "- 没有技能明确适用时：不要读任何 SKILL.md，直接用通用工具",
+        "",
+        "**重要**：技能不是工具，不能直接调用。使用技能的唯一方式是用 `read_file`",
+        "读取 SKILL.md 然后按内容操作。一次只读一个技能，选中再读。",
+        "",
+        "以下是可用技能：",
+        "",
+        skills_prompt,
     ])
 
 

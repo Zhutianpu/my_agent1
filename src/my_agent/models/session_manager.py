@@ -55,30 +55,45 @@ class Session:
     def add_reply(self, reply: str):
         self.messages.append({"role": "assistant", "content": reply})
 
-    def discard_exceeding(self):
-        """超长裁剪。SIMPLIFIED: 按消息条数裁（CowAgent 按 token 数），
-        永远保住第 0 条 system prompt。
-        关键教训（CowAgent 注释）：工具"订单+回执"成对，裁剪只能落在
-        user 消息的边界上，否则孤儿 tool 消息会让 API 直接报错。
+    # 蒸馏摘要注回消息的固定标记（inject_summary / discard_exceeding 都认它）
+    SUMMARY_MARK = "【早前对话的蒸馏摘要】"
 
-        阶段 7：返回被裁掉的消息列表——裁剪即蒸馏的触发点
-        （CowAgent summarizer 的同款触发设计）。"""
+    def inject_summary(self, summary: str):
+        """把蒸馏摘要作为 system 消息注回到头部（紧跟编译 prompt 之后）。
+        已存在就替换（摘要随蒸馏滚动更新，不堆积）。
+        对齐 CowAgent context_summary_callback：裁掉的上下文以浓缩形态留在场上。"""
+        note = {"role": "system", "content": f"{self.SUMMARY_MARK}\n{summary}"}
+        if len(self.messages) > 1 and self.messages[1].get("role") == "system" \
+                and str(self.messages[1].get("content", "")).startswith(self.SUMMARY_MARK):
+            self.messages[1] = note
+        else:
+            self.messages.insert(1, note)
+
+    def discard_exceeding(self):
+        """超长裁剪。SIMPLIFIED: 按消息条数裁（CowAgent 按 token 数）。
+
+        保护清单（裁剪的高压线）：
+        - 开头的 system 消息群（编译 prompt + 蒸馏摘要注回）永远保留
+        - 裁剪只能落在 user 边界上（工具"订单+回执"成对，孤儿 tool 消息会让 API 报错）
+
+        返回被裁掉的消息列表——裁剪即蒸馏的触发点。"""
         max_msgs = int(conf().get("conversation_max_messages", 40))  # env 覆盖是字符串，必须转
         if len(self.messages) <= max_msgs:
             return []
+        # 头部 system 群（编译 prompt + 可能的摘要注回）不参与裁剪
+        head = 0
+        while head < len(self.messages) and self.messages[head].get("role") == "system":
+            head += 1
         # 找能容纳进预算的最早 user 边界
-        start = 1
-        for i, m in enumerate(self.messages):
-            if i > 0 and m.get("role") == "user" and len(self.messages) - i <= max_msgs - 1:
+        start = None
+        for i in range(head, len(self.messages)):
+            if self.messages[i].get("role") == "user" and head + (len(self.messages) - i) <= max_msgs:
                 start = i
                 break
-        discarded = self.messages[1:start]
-        self.messages = [self.messages[0]] + self.messages[start:]
-        # 兜底清理：开头绝不能是 tool 回执或挂着订单的 assistant
-        while len(self.messages) > 1 and (
-            self.messages[1].get("role") == "tool" or self.messages[1].get("tool_calls")
-        ):
-            discarded.append(self.messages.pop(1))
+        if start is None:
+            return []  # 一个 user 轮本身就超预算（工具消息太多）：保全部，下轮再说
+        discarded = self.messages[head:start]
+        self.messages = self.messages[:head] + self.messages[start:]
         return discarded
 
 

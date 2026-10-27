@@ -102,23 +102,47 @@ def test_dream_without_dailies_noop(tmp_path):
 
 
 def test_trim_triggers_flush_via_agent(tmp_path, monkeypatch):
-    """集成：裁剪即蒸馏——把会话预算压小，消息超预算时 trim → 日记落盘。
+    """集成：裁剪即蒸馏——预算外消息在**循环前**蒸馏，摘要注回活上下文。
 
-    注意时序：裁剪发生在"用户消息入列"后、循环前，所以第 N 轮的回复
-    要第 N+1 轮才被裁。预算=4 时，第三轮才触发第一次裁剪。"""
+    时序（真机抓过的坑）：蒸馏必须在循环前——否则"刚写完的东西被裁掉，
+    用户下一句回复时模型当场失忆"。预算=4 时第三轮触发首次裁剪。"""
     monkeypatch.setenv("CONVERSATION_MAX_MESSAGES", "4")
-    bot = ScriptedBot(["回答1", "回答2", "回答3", "- 蒸馏出的要点"])
+    bot = ScriptedBot(["回答1", "回答2", "- 蒸馏出的要点", "回答3"])
     agent = Agent(bot=bot, memory=MemoryManager(tmp_path, bot))
     ctx = lambda: Context(kwargs={"session_id": "trim7"})
     agent.run("问题1", ctx())
     agent.run("问题2", ctx())
     assert not list((tmp_path / "memory").glob("*.md"))  # 还没超预算
-    agent.run("问题3", ctx())  # 7 条 > 4：裁掉问题1/回答1/问题2/回答2 去蒸馏
+    agent.run("问题3", ctx())  # 超预算：先蒸馏（第3次LLM调用），再循环（第4次）
     diaries = list((tmp_path / "memory").glob("*.md"))
     assert len(diaries) == 1 and "蒸馏出的要点" in diaries[0].read_text(encoding="utf-8")
-    # 蒸馏发生在循环之后：蒸馏输入里应能看到被裁掉的对话
-    flush_call = bot.seen[-1]
-    assert "问题1" in str(flush_call)
+    flush_call, loop_call = bot.seen[2], bot.seen[3]
+    assert "问题1" in str(flush_call)            # 蒸馏输入是被裁掉的对话
+    assert "早前对话的蒸馏摘要" in str(loop_call)  # 摘要注回了活上下文
+    assert "蒸馏出的要点" in str(loop_call)
+
+
+def test_summary_note_survives_trim():
+    """摘要注回消息是头部 system 群的一员，后续裁剪不许把它裁掉。"""
+    session = SESSIONS.build_session("sum7")
+    session.inject_summary("第一批要点")
+    for i in range(10):
+        session.add_query(f"q{i}")
+        session.add_reply(f"a{i}")
+    import os
+    os.environ["CONVERSATION_MAX_MESSAGES"] = "6"
+    try:
+        session.discard_exceeding()
+    finally:
+        del os.environ["CONVERSATION_MAX_MESSAGES"]
+    assert session.messages[0]["role"] == "system"
+    assert "第一批要点" in session.messages[1]["content"]
+    # 再次注回是替换不是堆积
+    session.inject_summary("第二批要点")
+    assert "第二批要点" in session.messages[1]["content"]
+    assert sum(1 for m in session.messages if "蒸馏摘要" in str(m.get("content", ""))) == 1
+    # 裁剪后开头必须是 user（无孤儿 tool/assistant）
+    assert session.messages[2]["role"] == "user"
 
 
 # ---------- 7c 检索 ----------

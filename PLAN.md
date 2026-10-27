@@ -109,12 +109,15 @@ my-agent/
 - [ ] **真机验收**：聊几轮 → 退出重开 → 历史还在；CONVERSATION_MAX_MESSAGES=8
       聊十几轮 → memory/日期.md 出现；#dream → MEMORY.md 更新；问"我之前说过X" → 它用 memory_search
 
-### 阶段 8：skills
-> 对齐 `agent/skills/`（loader 361 + manager 519 → 简化）
+### 阶段 8：skills ✅ 2026-10-27（测试 58 绿，待真机验收）
+> 对齐 `agent/skills/`（loader 361 + manager 519 → 简化到 ~120 行）
 
-- [ ] loader.py：扫 `skills/` 目录、解析 SKILL.md frontmatter（name+description+正文）
-- [ ] manager.py：描述注入 prompt（走 builder 分段）、命中时按需加载正文
-- [ ] **验收**：扔一个自建 SKILL.md 进去，相关提问时 agent 用上它
+- [x] loader.py：扫 `skills/<技能名>/SKILL.md`、解析 frontmatter（手写 --- 围栏解析，
+      只认 name/description，不引 PyYAML；递归/缓存/元数据全砍）
+- [x] manager.py：出描述清单进 prompt（builder 最后坑位兑现）；
+      正文不进 prompt——纪律写死在技能段："技能不是工具，唯一用法是 read_file 读 SKILL.md"
+- [x] 预置演示技能 workspaces/default/skills/weekly-report/
+- [ ] **真机验收**：#reset 后说"帮我写周报" → agent 主动 read_file 读 SKILL.md 并照格式输出
 
 ### 阶段 9：MCP（CowAgent 版）
 > 核心洞察：McpTool 适配器 33 行——远程工具包成 BaseTool，模型分不清本地/远程

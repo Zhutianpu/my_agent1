@@ -32,7 +32,9 @@ def ensure_workspace(workspace_dir) -> Path:
     """保证 workspace 存在并补齐模板文件。返回 Path。"""
     ws = Path(workspace_dir)
     ws.mkdir(parents=True, exist_ok=True)
-    (ws / "memory").mkdir(exist_ok=True)  # 阶段 7 的每日记忆目录，先备好
+    (ws / "memory").mkdir(exist_ok=True)   # 阶段 7 的每日记忆目录
+    (ws / "skills").mkdir(exist_ok=True)   # 阶段 8 的技能目录（SIMPLIFIED: CowAgent
+                                           # 跨 agent 共享，我们每 agent 一份，P2 再议）
     _create_if_missing(ws / DEFAULT_AGENT_FILENAME, _AGENT_TEMPLATE)
     _create_if_missing(ws / DEFAULT_USER_FILENAME, _USER_TEMPLATE)
     _create_if_missing(ws / DEFAULT_MEMORY_FILENAME, _MEMORY_TEMPLATE)

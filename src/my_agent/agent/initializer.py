@@ -22,6 +22,7 @@ from ..config import ROOT, conf
 from .memory import MemoryManager, MemoryStore
 from .prompt import build_system_prompt, ensure_workspace, load_context_files
 from .protocol.agent import Agent
+from .skills import SkillManager
 from .tools import TOOLS
 from .tools.memory_search import MemorySearchTool
 
@@ -49,7 +50,8 @@ def initialize_agent(bot, agent_id: str = None, workspace_dir=None) -> Agent:
         "cwd": str(ROOT),  # 工具的 cwd ≠ agent 的家——真机教训：不说清楚它找不到 PLAN.md
         "agent_id": agent_id,
     }
-    # 阶段 8：skill_manager = load_skills(ws)
+    # 阶段 8：技能系统——扫 workspaces/<agent_id>/skills/，出描述清单进 prompt
+    skill_manager = SkillManager(ws / "skills").refresh()
 
     # --- 编译 ---
     system_prompt = build_system_prompt(
@@ -58,6 +60,7 @@ def initialize_agent(bot, agent_id: str = None, workspace_dir=None) -> Agent:
         runtime_info=runtime_info,
         identity_fallback=conf().get("character_desc", ""),
         memory_digest=memory.recent_digest(),
+        skill_manager=skill_manager,
     )
     logger.info(f"[Initializer] agent={agent_id} prompt 编译完成（{len(system_prompt)} 字符，"
                 f"{len(context_files)} 个上下文文件）")

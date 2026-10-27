@@ -34,6 +34,15 @@ class Agent:
         session.add_query(query)
         discarded = session.discard_exceeding()  # 循环外只裁一次；裁掉的去蒸馏
 
+        # 7b：裁剪即蒸馏——必须在循环前做（对齐 CowAgent 的时机）。
+        # 真机教训：曾在回复后才蒸馏，结果"刚写完周报、上下文被裁、用户回复时
+        # 模型当场失忆"。摘要注回活上下文（context_summary_callback 同款），
+        # 模型这轮就能看见"早前聊了什么的浓缩版"。
+        if discarded and self.memory:
+            summary = self.memory.flush(discarded)
+            if summary:
+                session.inject_summary(summary)
+
         on_event({"type": "agent_start", "data": {}})
         try:
             text = run_loop(
@@ -47,8 +56,4 @@ class Agent:
             return Reply(ReplyType.ERROR, f"出错了: {e}")
         on_event({"type": "agent_end", "data": {}})
         SESSIONS.save_session(session)  # 7a：落盘
-
-        # 7b：裁剪即蒸馏（回复已流式出去，蒸馏延迟用户感知不到）
-        if discarded and self.memory:
-            self.memory.flush(discarded)
         return Reply(ReplyType.TEXT, text)
