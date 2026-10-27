@@ -1,0 +1,16 @@
+# 密钥与本地状态
+config.json
+.env
+run.log
+memory/
+workspaces/
+hello.txt
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.venv/

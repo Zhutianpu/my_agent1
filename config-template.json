@@ -1,0 +1,10 @@
+{
+    "model": "deepseek-chat",
+    "bot_type": "openai_compatible",
+    "open_ai_api_key": "",
+    "open_ai_api_base": "https://api.deepseek.com",
+    "character_desc": "你是 my-agent，一个通用个人助手。",
+    "conversation_max_messages": 40,
+    "agent_max_turns": 8,
+    "tool_result_max_chars": 6000
+}
