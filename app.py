@@ -1,14 +1,14 @@
-"""my-agent 入口：起 terminal channel。
+"""my-agent 入口：channel_factory 按配置起 channel（对齐 CowAgent app.py）。
 
-对齐 CowAgent 的 app.py：加载配置 → 起 channel。SIMPLIFIED 到只有一路 channel。
-阶段 9：退出时关掉 MCP 子进程（不留孤儿）。
+阶段 10：channel 从配置读（"channel": "terminal" | "web"），默认 terminal。
+退出时关掉 MCP 子进程（不留孤儿）。
 """
 
-from my_agent.channel.terminal import TerminalChannel
+from my_agent.channel.factory import create_channel
 
 if __name__ == "__main__":
     try:
-        TerminalChannel().startup()
+        create_channel().startup()
     finally:
         from my_agent.agent.tools.mcp import shutdown_all
         shutdown_all()

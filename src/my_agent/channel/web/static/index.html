@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>my-agent</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.6 "Segoe UI", system-ui, sans-serif;
+         background: #1b1e23; color: #e6e6e6; height: 100vh;
+         display: flex; flex-direction: column; }
+  #log { flex: 1; overflow-y: auto; padding: 16px 20px; }
+  .row { margin: 8px 0; white-space: pre-wrap; word-break: break-word; }
+  .user { color: #9ecbff; }
+  .user::before { content: "你: "; color: #6b8aad; }
+  .agent::before { content: "Agent: "; color: #8a8f98; }
+  .tool { color: #c9a86a; font-family: Consolas, monospace; font-size: 12.5px; }
+  .sys { color: #7f8890; font-size: 12.5px; }
+  #confirm { display: none; padding: 10px 20px; background: #3a2f1d;
+             border-top: 1px solid #6b5a2e; }
+  #confirm button { margin-left: 8px; }
+  #bar { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid #333; }
+  #input { flex: 1; padding: 8px 10px; background: #26292f; color: #e6e6e6;
+           border: 1px solid #3a3d44; border-radius: 6px; outline: none; }
+  button { padding: 8px 14px; background: #2f6feb; color: #fff; border: 0;
+           border-radius: 6px; cursor: pointer; }
+  #confirm button { background: #5a4a1f; }
+</style>
+</head>
+<body>
+<div id="log"></div>
+<div id="confirm">
+  ⚠️ agent 请求危险操作：<span id="confirm-text"></span>
+  <button data-a="y">允许一次</button>
+  <button data-a="a">此类都允许</button>
+  <button data-a="n">拒绝</button>
+</div>
+<div id="bar">
+  <input id="input" placeholder="说点什么…（#reset 清对话，#dream 沉淀记忆）" autofocus>
+  <button id="send">发送</button>
+</div>
+<script>
+const log = document.getElementById("log");
+let cur = null;  // 当前 agent 气泡：一轮内的文本增量追加到这里
+
+function addRow(cls, text) {
+  const div = document.createElement("div");
+  div.className = "row " + cls;
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+// SSE：后端把 agent 的 on_event 事件原样推过来，前端按类型渲染
+const es = new EventSource("/api/stream");
+es.onmessage = (e) => {
+  const ev = JSON.parse(e.data);
+  const d = ev.data || {};
+  if (ev.type === "agent_start") {
+    cur = addRow("agent", "");
+  } else if (ev.type === "message_update") {
+    if (!cur) cur = addRow("agent", "");
+    cur.textContent += d.delta || "";
+    log.scrollTop = log.scrollHeight;
+  } else if (ev.type === "tool_execution_start") {
+    addRow("tool", "  🔧 " + d.tool_name + " " +
+           JSON.stringify(d.arguments || "").slice(0, 200));
+  } else if (ev.type === "tool_execution_end") {
+    addRow("tool", "  " + (d.status === "success" ? "✓" : "✗") + " " + d.tool_name);
+  } else if (ev.type === "confirm_request") {
+    document.getElementById("confirm-text").textContent =
+      d.tool_name + " " + JSON.stringify(d.arguments || "").slice(0, 200);
+    document.getElementById("confirm").style.display = "block";
+  } else if (ev.type === "notice") {
+    addRow("sys", d.text || "");
+  } else if (ev.type === "error") {
+    addRow("sys", "❌ " + (d.error || ""));
+  } else if (ev.type === "agent_end") {
+    cur = null;
+  }
+};
+
+// 权限确认条：答案 POST 回去，后端正在等的 agent 线程被放行
+document.querySelectorAll("#confirm button").forEach(btn => {
+  btn.onclick = async () => {
+    document.getElementById("confirm").style.display = "none";
+    await fetch("/api/confirm", {method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({answer: btn.dataset.a})});
+  };
+});
+
+const input = document.getElementById("input");
+async function send() {
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  if (!text.startsWith("#")) addRow("user", text);
+  await fetch("/api/chat", {method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({text})});
+}
+document.getElementById("send").onclick = send;
+input.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+</script>
+</body>
+</html>

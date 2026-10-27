@@ -140,13 +140,20 @@ my-agent/
       mcp_time_echo 远程回显端到端通 ✅（"现在几点"走了本地 current_time——
       描述重叠时模型自己挑，前缀只防注册撞名、不管选择偏好，属预期行为）
 
-### 阶段 10：简约 Web console
+### 阶段 10：简约 Web console ✅ 2026-10-27（测试 77 绿，真机验收过：页面/SSE/冒烟通过，浏览器交互用户确认）
 > 对齐 `channel/web` 的位置，技术栈换 FastAPI + SSE（比 web.py 现代）
 
-- [ ] channel_factory 成立（app.py 按配置起 terminal 或 web——对齐 CowAgent 入口）
-- [ ] channel/web/：FastAPI + SSE 流式推送（复用 on_event 机制，web 转播员）
-- [ ] 简约前端：单页聊天窗（消息流 + 工具事件展示），无构建工具，原生 JS
-- [ ] **验收**：浏览器聊天与终端同行为；自问三问第 3 条"只重写 channel/"得到验证
+- [x] channel_factory 成立（app.py 按配置起 terminal 或 web——对齐 CowAgent 入口；
+      config "channel": "terminal" | "web"，默认 terminal）
+- [x] channel/web/：FastAPI + SSE 流式推送（复用 on_event 机制，web 转播员：
+      同一份事件字典，不 print 改广播；EventHub 多播队列 + 心跳保活）
+- [x] 权限闸的缝兑现：web_confirm 异步询问器（confirm_request 事件 → 浏览器确认条
+      → POST /api/confirm → threading.Event 唤醒 agent 线程；超时默认拒）
+- [x] 简约前端：单页聊天窗（消息流 + 工具事件展示 + 确认条），无构建工具，原生 JS
+- [x] 砍：auth、多会话、workspace/memory/skills 管理 API、上传、前端框架
+- [x] **真机验收**：config.json 加 "channel": "web" → 浏览器聊天 ✅
+      （页面 200 / SSE 已连接 / 浏览器交互用户确认；三问第 3 条"只重写 channel/"兑现：
+      agent 核心一行未改，事件流/权限闸注入点原样复用）
 
 ### 阶段 11（可选）：subagent 子代理
 > 对齐 `agent/subagent` + `tools/subagent`；myself step9 经验；P2 多 agent 的跳板

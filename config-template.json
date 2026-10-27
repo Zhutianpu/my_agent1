@@ -1,4 +1,6 @@
 {
+    "channel": "terminal",
+    "web_port": 8765,
     "model": "deepseek-chat",
     "bot_type": "openai_compatible",
     "open_ai_api_key": "",
