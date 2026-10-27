@@ -11,6 +11,7 @@ from .base_tool import BaseTool, ToolResult
 
 class EditFileTool(BaseTool):
     name = "edit_file"
+    risk = "write"  # 改文件，首次执行问用户
     description = (
         "精确替换文件中的一段文字：把 old_text 替换为 new_text。"
         "old_text 必须在文件中唯一出现一次，适合小改动（比 write_file 整文件覆盖安全）。"

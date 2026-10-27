@@ -7,6 +7,7 @@ from .base_tool import BaseTool, ToolResult
 
 class WriteFileTool(BaseTool):
     name = "write_file"
+    risk = "write"  # 覆盖式写文件，首次执行问用户
     description = "把内容写入指定文件（整文件覆盖，父目录不存在会自动创建）。"
     params = {
         "type": "object",

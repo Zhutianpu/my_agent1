@@ -82,14 +82,16 @@ my-agent/
 - [x] Agent 注入编译后 prompt，每次 run 刷新 session 第 0 条；#reset 连 agent 一起重装
 - [ ] **真机验收**：改 AGENT.md 后 #reset，agent 自我认知变化；workspaces/default/ 目录生成
 
-### 阶段 6：permission 权限闸
-> 对齐 CowAgent `agent/permission`，经验来自 offer-coach 的 permission/gate.py
+### 阶段 6：permission 权限闸 ✅ 2026-10-27（测试 41 绿，待真机验收）
+> 对齐 CowAgent `agent/permission`，交互式简化（静态政策闸 982 行 → 交互闸 ~80 行）
 
-- [ ] 工具标注风险级（read 只读 / write、run_command 危险）
-- [ ] 危险操作首次执行前问用户（terminal 里 y/n），remembered 集合记住选择
-- [ ] 审计留痕：谁批准/拒绝了什么，进 run.log
-- [ ] **验收**：agent 要写文件时先问你；同意一次后同类不再问；拒绝后模型收到
-      "用户拒绝"的错误文本并换方案
+- [x] Decision(allowed, reason) 契约照搬；工具自报风险级（BaseTool.risk：
+      read 自动放行 / write 首次问用户）——SIMPLIFIED: 不做 bash 静态分析
+- [x] 危险操作首次执行前问 y=一次/a=此类都允许/n=拒绝；remembered 集合进程内记住
+- [x] 拒绝变错误文本回填模型（D004 延伸，同构 CowAgent _permission_denial）
+- [x] 审计进 run.log；闸挂在 ToolManager.execute 必经之路，loop 一行不改；
+      handler 由 channel 注入（headless 无 handler = 放行，web 阶段换异步）
+- [ ] **真机验收**：agent 要写文件时先问你；a 后同类不再问；n 后模型换方案
 
 ### 阶段 7：memory（CowAgent 版）
 > 对齐 `agent/memory/`：记忆是可检索的，蒸馏是流水线，向量可降级

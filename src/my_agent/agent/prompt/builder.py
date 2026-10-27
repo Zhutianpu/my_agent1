@@ -41,9 +41,10 @@ def build_system_prompt(
     if tools:
         sections.append(_tools_section(tools))
 
-    # 2. 工作空间说明段（agent 得知道"家"在哪、文件各是什么）
+    # 2. 工作空间说明段（agent 得知道"家"在哪、cwd 在哪、文件各是什么）
     if runtime_info and runtime_info.get("workspace_dir"):
-        sections.append(_workspace_section(runtime_info["workspace_dir"]))
+        sections.append(_workspace_section(
+            runtime_info["workspace_dir"], runtime_info.get("cwd", "")))
 
     # 阶段 7：记忆摘要段插在这里（memory_digest）
     # 阶段 8：技能清单段插在这里（skill_manager）
@@ -75,8 +76,8 @@ def _tools_section(tools: List[dict]) -> str:
     return "\n".join(lines)
 
 
-def _workspace_section(workspace_dir: str) -> str:
-    return "\n".join([
+def _workspace_section(workspace_dir: str, cwd: str = "") -> str:
+    lines = [
         "## 🏠 工作空间",
         "",
         f"你的工作目录：`{workspace_dir}`——这是你的家，里面的文件定义了你是谁。",
@@ -85,7 +86,14 @@ def _workspace_section(workspace_dir: str) -> str:
         "- `USER.md`：用户的基本信息（了解到的静态信息写进去）",
         "- `MEMORY.md`：长期记忆（重要的事写下来，不要只在心里记）",
         "- `memory/`：每日记录目录",
-    ])
+    ]
+    if cwd:
+        lines += [
+            "",
+            f"工具的当前工作目录（cwd）是：`{cwd}`。用户说的项目文件大多在那里，",
+            "不在你的家里——家里找不到时，用相对路径（如 `PLAN.md`）或绝对路径直接去 cwd 找。",
+        ]
+    return "\n".join(lines)
 
 
 def _context_files_section(context_files: List[ContextFile]) -> str:

@@ -1,4 +1,4 @@
-"""终端 channel：REPL 入口（阶段 4 版：流式实况）。
+"""终端 channel：REPL 入口（阶段 6 版：权限闸询问器）。
 
 契约不变：
   startup()：while True 收键盘输入 → 包装 Context → produce
@@ -7,13 +7,30 @@
 流式防重印（CowAgent terminal_channel 的同款坑）：答案已经通过
 message_update 事件逐字打印过了，send() 就不能再印一遍——
 用 renderer.streamed 标记判断。
+
+阶段 6：启动时向权限闸注入询问器（GATE.confirm_handler）。
+危险操作会在循环中同步弹 input() 问你。web channel（阶段 10）
+会注入异步版——这个注入点就是缝。
 """
 
+import json
+
+from ..agent.permission import GATE
 from ..bridge.context import Context, ContextType
 from ..bridge.reply import Reply, ReplyType
 from ..common import const
 from ..models.session_manager import SESSIONS
 from .channel import ChatChannel
+
+
+def _terminal_confirm(tool_name: str, args: dict) -> str:
+    """权限闸的终端询问器：y=允许一次 / a=此类都允许 / 其他=拒绝（默认安全）。"""
+    preview = json.dumps(args, ensure_ascii=False)
+    if len(preview) > 200:
+        preview = preview[:200] + "..."
+    print(f"\n  ⚠️  agent 请求危险操作：{tool_name} {preview}")
+    ans = input("  允许？[y=允许一次 / a=此类都允许 / n=拒绝] ").strip().lower()
+    return ans if ans in ("y", "a") else "n"
 
 
 class TerminalRenderer:
@@ -51,6 +68,7 @@ class TerminalChannel(ChatChannel):
         self.renderer = TerminalRenderer()
 
     def startup(self):
+        GATE.confirm_handler = _terminal_confirm  # 权限闸接上终端
         print("my-agent 已启动。输入对话开始，#exit 退出，#reset 清空对话。\n")
         while True:
             try:

@@ -79,8 +79,11 @@ def test_builder_sections_gated_by_ingredients():
     assert "我是阿牛" in p
     # 给运行时信息
     p = build_system_prompt(runtime_info={"now": "2026-10-27 09:00:00", "model": "m1",
-                                          "workspace_dir": "/tmp/ws", "agent_id": "default"})
+                                          "workspace_dir": "/tmp/ws", "cwd": "/tmp/proj",
+                                          "agent_id": "default"})
     assert "2026-10-27 09:00:00" in p and "m1" in p and "/tmp/ws" in p
+    # 真机教训：cwd 必须出现在工作空间段，否则 agent 以为世界只有它的家
+    assert "/tmp/proj" in p and "cwd" in p
 
 
 def test_builder_identity_fallback():

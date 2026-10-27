@@ -36,6 +36,11 @@ class ToolManager:
             kwargs = json.loads(arguments_json or "{}")
         except json.JSONDecodeError as e:
             return ToolResult.fail(f"error: 参数不是合法 JSON: {e}")
+        # 权限闸（阶段 6）：危险操作先过闸。拒绝变成错误文本回给模型（D004 延伸）。
+        from ..permission import GATE  # 局部 import：permission 不认识 tools，防环
+        decision = GATE.check(tool, kwargs)
+        if not decision:
+            return ToolResult.fail(f"error: 权限拒绝：{decision.reason}")
         try:
             return tool.execute(**kwargs)
         except TypeError as e:

@@ -28,6 +28,9 @@ class BaseTool:
     name: str = "base_tool"
     description: str = ""
     params: dict = {}  # JSON Schema
+    # 风险自报（阶段 6 权限闸）：read=只读自动放行；write=会改东西，首次问用户。
+    # SIMPLIFIED: CowAgent 静态分析参数判断风险（982 行 bash 解析器），我们让工具自报。
+    risk: str = "read"
 
     def execute(self, **kwargs) -> ToolResult:
         raise NotImplementedError

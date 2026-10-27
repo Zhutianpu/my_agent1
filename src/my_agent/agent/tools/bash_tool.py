@@ -26,6 +26,7 @@ _DANGEROUS = [
 
 class RunCommandTool(BaseTool):
     name = "run_command"
+    risk = "write"  # 任意命令执行，首次问用户（硬黑名单仍是最后一道防线）
     description = "执行一条 shell 命令并返回输出（有超时和危险命令拦截）。"
     params = {
         "type": "object",

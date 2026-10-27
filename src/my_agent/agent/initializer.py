@@ -41,6 +41,7 @@ def initialize_agent(bot, agent_id: str = None, workspace_dir=None) -> Agent:
         "now": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "model": conf().get("model", ""),
         "workspace_dir": str(ws),
+        "cwd": str(ROOT),  # 工具的 cwd ≠ agent 的家——真机教训：不说清楚它找不到 PLAN.md
         "agent_id": agent_id,
     }
     # 阶段 7：memory_manager = setup_memory(ws)
