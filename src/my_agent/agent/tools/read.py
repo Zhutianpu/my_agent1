@@ -24,10 +24,14 @@ class ReadFileTool(BaseTool):
     }
 
     def execute(self, path: str, offset: int = 1, limit: int = 400) -> ToolResult:
-        p = Path(path)
+        p = Path(path).expanduser()
+        if p.is_dir():
+            return ToolResult.fail(f"error: {path} 是目录不是文件（列目录请用 ls）")
         if not p.is_file():
-            return ToolResult.fail(f"error: 文件不存在: {path}")
-        lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+            # 报出解析后的绝对路径：模型能看到自己相对路径解析到了哪，自我纠正
+            return ToolResult.fail(f"error: 文件不存在: {path}（已解析为 {p.absolute()}）")
+        text = _read_text_best_effort(p)
+        lines = text.splitlines()
         total = len(lines)
         chunk = lines[offset - 1: offset - 1 + limit]
         text = "\n".join(chunk)
@@ -35,3 +39,16 @@ class ReadFileTool(BaseTool):
         if len(text) > max_chars:
             text = text[:max_chars] + f"\n...（已截断，共 {total} 行，本次返回第 {offset}~{offset + len(chunk) - 1} 行）"
         return ToolResult.success(text if text else "（空文件）")
+
+
+def _read_text_best_effort(p: Path) -> str:
+    """Windows 真机教训：中文环境里很多文件是 GBK 存的（echo/记事本默认），
+    硬按 utf-8 + errors=replace 读出来全是乱码等于"读不到"。
+    按 utf-8-sig（兼容 BOM）→ gbk 顺序试，都失败才退回 replace。"""
+    raw = p.read_bytes()
+    for enc in ("utf-8-sig", "gbk"):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")

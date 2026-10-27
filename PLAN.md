@@ -69,17 +69,18 @@ my-agent/
 
 ## 待做（按依赖顺序）
 
-### 阶段 5：prompt builder + workspace + 装配间
+### 阶段 5：prompt builder + workspace + 装配间 ✅ 2026-10-27（测试 33 绿，待真机验收）
 > 对齐 CowAgent `agent/prompt/builder.py` + `agent/workspace` + `bridge/agent_initializer.py`
 
-- [ ] workspace：`workspaces/<agent_id>/` 目录（P2 的缝落地），内置模板文件
-      `SOUL.md`（身份）/ `USER.md`（用户画像）——对齐 ensure_workspace + load_context_files
-- [ ] prompt/builder.py：分段编译 system prompt（身份 / 工具清单 / workspace 文件 /
-      记忆摘要 / 技能 / 运行时信息），每段可开关
-- [ ] agent/initializer.py：装配间从 Bridge 里独立出来（备料→编译→总装→恢复历史），
-      签名留 `agent_id=None`（P2 的缝）
-- [ ] 顺手补两个工具：edit（精确替换，CowAgent 有）、current_time
-- [ ] **验收**：改 SOUL.md 后 agent 自我认知变化；换 workspace 目录行为随之变化
+- [x] workspace：`workspaces/<agent_id>/` 目录（P2 的缝落地），内置模板文件
+      `AGENT.md`（身份）/ `USER.md`（用户画像）/ `MEMORY.md` + `memory/` 子目录
+      ——对齐 ensure_workspace + load_context_files（模板砍到 3 个，RULE 并进 AGENT，BOOTSTRAP 不做）
+- [x] prompt/builder.py：分段编译 system prompt（工具 / workspace 说明 / 上下文文件 /
+      运行时信息），每段"存在即编译"；记忆段、技能段坑位已留（阶段 7/8 接入不改 builder）
+- [x] agent/initializer.py：装配间独立（备料→编译→总装），签名 `agent_id=None`（P2 的缝）
+- [x] 补两个工具：edit_file（精确替换，唯一性校验）+ current_time
+- [x] Agent 注入编译后 prompt，每次 run 刷新 session 第 0 条；#reset 连 agent 一起重装
+- [ ] **真机验收**：改 AGENT.md 后 #reset，agent 自我认知变化；workspaces/default/ 目录生成
 
 ### 阶段 6：permission 权限闸
 > 对齐 CowAgent `agent/permission`，经验来自 offer-coach 的 permission/gate.py

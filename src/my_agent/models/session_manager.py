@@ -26,6 +26,17 @@ class Session:
     def reset(self):
         self.messages = [{"role": "system", "content": self.system_prompt}]
 
+    def set_system_prompt(self, prompt: str):
+        """刷新编译好的 system prompt（阶段 5：prompt 是编译产物，每次装配可更新）。
+        只动第 0 条，历史消息不碰。"""
+        if not prompt or prompt == self.system_prompt:
+            return
+        self.system_prompt = prompt
+        if self.messages and self.messages[0].get("role") == "system":
+            self.messages[0]["content"] = prompt
+        else:
+            self.messages.insert(0, {"role": "system", "content": prompt})
+
     def add_query(self, query: str):
         self.messages.append({"role": "user", "content": query})
 

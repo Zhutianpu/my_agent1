@@ -65,7 +65,11 @@ class TerminalChannel(ChatChannel):
                 break
             if prompt == "#reset":
                 SESSIONS.clear_session(self.session_id)
-                print("（对话已清空）\n")
+                # 连装配好的 agent 一起丢：下一条消息重新装配、重编 prompt。
+                # 改了 AGENT.md 想立即生效：改完打个 #reset。
+                from ..bridge.bridge import Bridge
+                Bridge().reset_agent()
+                print("（对话已清空，身份已重新装配）\n")
                 continue
             if prompt.startswith("#"):
                 # # 开头但不是已知命令：拦截提醒，不送给模型

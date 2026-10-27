@@ -16,8 +16,11 @@ from .loop import run_loop
 
 
 class Agent:
-    def __init__(self, bot, max_turns: int = None):
+    def __init__(self, bot, system_prompt: str = "", max_turns: int = None):
         self.bot = bot
+        # 编译好的 system prompt（阶段 5：由 initializer 装配时注入；
+        # 直接 new Agent(bot) 的测试/旧代码没有它，session 退回配置的 character_desc）
+        self.system_prompt = system_prompt
         self.max_turns = max_turns or conf().get("agent_max_turns", 8)
 
     def run(self, query: str, context: Context = None) -> Reply:
@@ -26,6 +29,7 @@ class Agent:
         on_event = (context.get("on_event") if context else None) or (lambda e: None)
 
         session = SESSIONS.build_session(session_id, agent_id)
+        session.set_system_prompt(self.system_prompt)  # 刷新第 0 条，历史不碰
         session.add_query(query)
         session.discard_exceeding()  # 循环外只裁一次
 
