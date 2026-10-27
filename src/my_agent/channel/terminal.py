@@ -69,7 +69,7 @@ class TerminalChannel(ChatChannel):
 
     def startup(self):
         GATE.confirm_handler = _terminal_confirm  # 权限闸接上终端
-        print("my-agent 已启动。输入对话开始，#exit 退出，#reset 清空对话。\n")
+        print("my-agent 已启动。输入对话开始，#exit 退出，#reset 清空对话，#dream 沉淀记忆。\n")
         while True:
             try:
                 prompt = input("你: ").strip()
@@ -89,10 +89,20 @@ class TerminalChannel(ChatChannel):
                 Bridge().reset_agent()
                 print("（对话已清空，身份已重新装配）\n")
                 continue
+            if prompt == "#dream":
+                # 阶段 7：手动触发"做梦"——最近日记蒸馏进 MEMORY.md
+                from ..bridge.bridge import Bridge
+                agent = Bridge().get_agent(const.DEFAULT_AGENT_ID)
+                if agent.memory:
+                    print(f"（🌙 dreaming...）")
+                    print(agent.memory.dream(), "\n")
+                else:
+                    print("（无记忆系统）\n")
+                continue
             if prompt.startswith("#"):
                 # # 开头但不是已知命令：拦截提醒，不送给模型
                 # （真机抓到的 bug："#rest" typo 被当成"我要休息"发给了模型）
-                print(f"（未知命令 {prompt}，目前只有 #exit / #reset）\n")
+                print(f"（未知命令 {prompt}，目前只有 #exit / #reset / #dream）\n")
                 continue
 
             self.renderer = TerminalRenderer()  # 每轮新转播员，重置 streamed

@@ -27,7 +27,7 @@ def build_system_prompt(
     context_files: Optional[List[ContextFile]] = None,
     runtime_info: Optional[Dict[str, Any]] = None,
     identity_fallback: str = "",
-    # 阶段 7 坑位：memory_digest=None
+    memory_digest: str = "",          # 阶段 7：最近日记摘要
     # 阶段 8 坑位：skill_manager=None
 ) -> str:
     """分段编译 system prompt。每段由原料是否存在决定（存在即编译）。"""
@@ -46,14 +46,17 @@ def build_system_prompt(
         sections.append(_workspace_section(
             runtime_info["workspace_dir"], runtime_info.get("cwd", "")))
 
-    # 阶段 7：记忆摘要段插在这里（memory_digest）
+    # 3. 记忆段（阶段 7）：最近日记摘要 + memory_search 用法提示
+    if memory_digest:
+        sections.append(_memory_section(memory_digest))
+
     # 阶段 8：技能清单段插在这里（skill_manager）
 
-    # 3. 上下文文件段（AGENT.md 在这里变成"我是谁"）
+    # 4. 上下文文件段（AGENT.md 在这里变成"我是谁"）
     if context_files:
         sections.append(_context_files_section(context_files))
 
-    # 4. 运行时信息段（元信息放最后——对齐 CowAgent）
+    # 5. 运行时信息段（元信息放最后——对齐 CowAgent）
     if runtime_info:
         sections.append(_runtime_section(runtime_info))
 
@@ -94,6 +97,17 @@ def _workspace_section(workspace_dir: str, cwd: str = "") -> str:
             "不在你的家里——家里找不到时，用相对路径（如 `PLAN.md`）或绝对路径直接去 cwd 找。",
         ]
     return "\n".join(lines)
+
+
+def _memory_section(digest: str) -> str:
+    return "\n".join([
+        "## 🧠 最近记忆",
+        "",
+        "以下是最近日记的摘要（更早的记忆用 memory_search 工具检索；",
+        "重要但已过时的内容会在 #dream 后沉淀进 MEMORY.md）：",
+        "",
+        digest,
+    ])
 
 
 def _context_files_section(context_files: List[ContextFile]) -> str:

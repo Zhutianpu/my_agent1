@@ -4,6 +4,7 @@ from .bash_tool import RunCommandTool
 from .current_time import CurrentTimeTool
 from .edit_file import EditFileTool
 from .ls import LsTool
+from .memory_search import MemorySearchTool
 from .read import ReadFileTool
 from .search_files import SearchFilesTool
 from .tool_manager import TOOLS
@@ -16,3 +17,4 @@ TOOLS.register(LsTool)
 TOOLS.register(RunCommandTool)
 TOOLS.register(SearchFilesTool)
 TOOLS.register(CurrentTimeTool)
+TOOLS.register(MemorySearchTool)

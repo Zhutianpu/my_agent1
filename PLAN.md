@@ -93,18 +93,21 @@ my-agent/
       handler 由 channel 注入（headless 无 handler = 放行，web 阶段换异步）
 - [ ] **真机验收**：agent 要写文件时先问你；a 后同类不再问；n 后模型换方案
 
-### 阶段 7：memory（CowAgent 版）
+### 阶段 7：memory（CowAgent 版）✅ 7a/7b/7c 2026-10-27（测试 52 绿，待真机验收）
 > 对齐 `agent/memory/`：记忆是可检索的，蒸馏是流水线，向量可降级
 
-- [ ] 7a 会话持久化：jsonl 落盘（key=(agent_id, session_id)），启动恢复
-- [ ] 7b 蒸馏流水线：`workspace/memory/YYYY-MM-DD.md`（日记）+ `MEMORY.md`（核心记忆）；
-      flush 超阈值 → LLM 蒸馏写日记；dream 汇总进核心记忆（先手动 #dream 触发）
-- [ ] 7c 检索：markdown chunker + 关键词检索；`memory_search` 工具挂进 ToolManager；
-      prompt 注入"最近日记摘要"（走阶段 5 的 builder 分段）
-- [ ] 7d（可选）向量增强：搬 offer-coach embedder（bge-small-zh 本地），
-      provider=None 保持纯关键词降级
+- [x] 7a 会话持久化：jsonl 落盘（workspaces/<agent_id>/sessions/，整写），启动恢复，
+      #reset 连磁盘一起清；测试经 conftest 关持久化防跨运行污染
+- [x] 7b 蒸馏流水线：**裁剪即蒸馏**（照搬 CowAgent 触发设计）——discard_exceeding
+      返回被裁消息 → LLM 蒸馏写 memory/YYYY-MM-DD.md；#dream 手动触发日记→MEMORY.md
+      （SIMPLIFIED: 同步蒸馏、无哈希去重、无定时器）
+- [x] 7c 检索：行窗口重叠 chunker + 关键词打分（向量缺席时的 CowAgent 降级档）；
+      memory_search 工具（装配间 bind 数据源）；prompt 注入最近日记
+      （阶段 5 builder 坑位兑现，builder 本体未改结构）
+- [ ] 7d（可选，未做）向量增强：搬 offer-coach embedder
 - [ ] 不做：deep_dream 定时器、知识图谱、hit_boost 调参
-- [ ] **验收**：聊 20+ 轮触发蒸馏 → 重启 → 旧事经 memory_search 召回
+- [ ] **真机验收**：聊几轮 → 退出重开 → 历史还在；CONVERSATION_MAX_MESSAGES=8
+      聊十几轮 → memory/日期.md 出现；#dream → MEMORY.md 更新；问"我之前说过X" → 它用 memory_search
 
 ### 阶段 8：skills
 > 对齐 `agent/skills/`（loader 361 + manager 519 → 简化）

@@ -19,9 +19,11 @@ from pathlib import Path
 from ..common import const
 from ..common.log import logger
 from ..config import ROOT, conf
+from .memory import MemoryManager, MemoryStore
 from .prompt import build_system_prompt, ensure_workspace, load_context_files
 from .protocol.agent import Agent
 from .tools import TOOLS
+from .tools.memory_search import MemorySearchTool
 
 
 def workspace_dir_for(agent_id: str) -> Path:
@@ -37,6 +39,9 @@ def initialize_agent(bot, agent_id: str = None, workspace_dir=None) -> Agent:
     # --- 备料 ---
     ensure_workspace(ws)
     context_files = load_context_files(ws)
+    # 阶段 7：记忆系统——蒸馏线（写）+ 检索线（读），memory_search 工具绑定数据源
+    memory = MemoryManager(ws, bot)
+    MemorySearchTool.bind(MemoryStore(ws))
     runtime_info = {
         "now": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "model": conf().get("model", ""),
@@ -44,7 +49,6 @@ def initialize_agent(bot, agent_id: str = None, workspace_dir=None) -> Agent:
         "cwd": str(ROOT),  # 工具的 cwd ≠ agent 的家——真机教训：不说清楚它找不到 PLAN.md
         "agent_id": agent_id,
     }
-    # 阶段 7：memory_manager = setup_memory(ws)
     # 阶段 8：skill_manager = load_skills(ws)
 
     # --- 编译 ---
@@ -53,9 +57,10 @@ def initialize_agent(bot, agent_id: str = None, workspace_dir=None) -> Agent:
         context_files=context_files,
         runtime_info=runtime_info,
         identity_fallback=conf().get("character_desc", ""),
+        memory_digest=memory.recent_digest(),
     )
     logger.info(f"[Initializer] agent={agent_id} prompt 编译完成（{len(system_prompt)} 字符，"
                 f"{len(context_files)} 个上下文文件）")
 
     # --- 总装 ---
-    return Agent(bot=bot, system_prompt=system_prompt)
+    return Agent(bot=bot, system_prompt=system_prompt, memory=memory)

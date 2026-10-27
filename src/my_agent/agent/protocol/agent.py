@@ -16,12 +16,13 @@ from .loop import run_loop
 
 
 class Agent:
-    def __init__(self, bot, system_prompt: str = "", max_turns: int = None):
+    def __init__(self, bot, system_prompt: str = "", max_turns: int = None, memory=None):
         self.bot = bot
         # 编译好的 system prompt（阶段 5：由 initializer 装配时注入；
         # 直接 new Agent(bot) 的测试/旧代码没有它，session 退回配置的 character_desc）
         self.system_prompt = system_prompt
-        self.max_turns = max_turns or conf().get("agent_max_turns", 8)
+        self.max_turns = max_turns or int(conf().get("agent_max_turns", 8))
+        self.memory = memory  # 阶段 7：蒸馏线（None = 无记忆，测试/旧代码路径）
 
     def run(self, query: str, context: Context = None) -> Reply:
         session_id = context.get("session_id") if context else None
@@ -31,7 +32,7 @@ class Agent:
         session = SESSIONS.build_session(session_id, agent_id)
         session.set_system_prompt(self.system_prompt)  # 刷新第 0 条，历史不碰
         session.add_query(query)
-        session.discard_exceeding()  # 循环外只裁一次
+        discarded = session.discard_exceeding()  # 循环外只裁一次；裁掉的去蒸馏
 
         on_event({"type": "agent_start", "data": {}})
         try:
@@ -42,6 +43,12 @@ class Agent:
         except Exception as e:
             logger.exception("[Agent] 循环异常")
             on_event({"type": "error", "data": {"error": str(e)}})
+            SESSIONS.save_session(session)  # 炸了也要保住历史
             return Reply(ReplyType.ERROR, f"出错了: {e}")
         on_event({"type": "agent_end", "data": {}})
+        SESSIONS.save_session(session)  # 7a：落盘
+
+        # 7b：裁剪即蒸馏（回复已流式出去，蒸馏延迟用户感知不到）
+        if discarded and self.memory:
+            self.memory.flush(discarded)
         return Reply(ReplyType.TEXT, text)
