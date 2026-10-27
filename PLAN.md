@@ -122,7 +122,7 @@ my-agent/
 - [x] 附带真机大修复：蒸馏时机挪到循环前 + 摘要注回活上下文
       （对齐 CowAgent context_summary_callback，修复"周报失忆"事件）
 
-### 阶段 9：MCP（CowAgent 版）✅ 2026-10-27（测试 66 绿，待真机验收）
+### 阶段 9：MCP（CowAgent 版）✅ 2026-10-27（测试 66 绿，真机验收过：握手→接入2工具→mcp_time_echo 端到端）
 > 核心洞察兑现：McpTool 适配器——远程工具包成 BaseTool，模型分不清本地/远程
 
 - [x] mcp_client.py：JSON-RPC 2.0 stdio 客户端（换行分隔 JSON；后台线程+队列
@@ -136,7 +136,9 @@ my-agent/
       server 级 risk 配置（默认 write 弹窗，read 放行）
 - [x] 零依赖验收 server：scripts/mcp_time_server.py（手写协议，不依赖 mcp SDK）
 - [ ] 不做：SSE/HTTP 传输、OAuth、tool_retrieval 动态加载、分页游标
-- [ ] **真机验收**：配好 mcp_servers.json → 问"现在几点" → mcp_time_ 工具出现
+- [x] **真机验收**：配好 mcp_servers.json → 握手 → 接入 2 个工具 →
+      mcp_time_echo 远程回显端到端通 ✅（"现在几点"走了本地 current_time——
+      描述重叠时模型自己挑，前缀只防注册撞名、不管选择偏好，属预期行为）
 
 ### 阶段 10：简约 Web console
 > 对齐 `channel/web` 的位置，技术栈换 FastAPI + SSE（比 web.py 现代）
