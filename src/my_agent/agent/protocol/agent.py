@@ -22,7 +22,10 @@ class Agent:
         # 编译好的 system prompt（阶段 5：由 initializer 装配时注入；
         # 直接 new Agent(bot) 的测试/旧代码没有它，session 退回配置的 character_desc）
         self.system_prompt = system_prompt
-        self.max_turns = max_turns or int(conf().get("agent_max_turns", 8))
+        # 默认 16（2026-10-28 从 8 上调）：8 是阶段 4 的保守刹车，真机里
+        # 一次派单验收就烧掉 6 轮，太紧；CowAgent 默认 100。刹车防的是
+        # 死循环烧 token，16 对单用户场景成本可忽略、余量够用。
+        self.max_turns = max_turns or int(conf().get("agent_max_turns", 16))
         self.memory = memory  # 阶段 7：蒸馏线（None = 无记忆，测试/旧代码路径）
         # 阶段 11 子代理两件套：
         self.tools = tools  # 裁剪后的工具注册表（None = 全局 TOOLS）

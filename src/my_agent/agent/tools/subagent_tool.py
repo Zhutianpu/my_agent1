@@ -103,7 +103,7 @@ class SubagentTool(BaseTool):
         logger.info(f"[SubagentTool] 派单 {len(tasks_list)} 个任务")
         results = run_tasks(
             tasks_list, bot=Bridge().get_bot("chat"),
-            parent_max_turns=int(conf().get("agent_max_turns", 8)),
+            parent_max_turns=int(conf().get("agent_max_turns", 16)),
         )
         payload = json.dumps({"results": results}, ensure_ascii=False)
         if all(r["status"] != "completed" for r in results):
