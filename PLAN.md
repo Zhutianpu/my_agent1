@@ -157,7 +157,7 @@ my-agent/
       （页面 200 / SSE 已连接 / 浏览器交互用户确认；三问第 3 条"只重写 channel/"兑现：
       agent 核心一行未改，事件流/权限闸注入点原样复用）
 
-### 阶段 11：subagent 子代理 ✅ 2026-10-28（测试 97 绿，待真机验收）
+### 阶段 11：subagent 子代理 ✅ 2026-10-28（测试 97 绿，真机验收过）
 > 对齐 `agent/subagent` + `tools/subagent`；P2 多 agent 的跳板
 
 - [x] subagent 工具：主 agent 派单，子代理独立 session（用完即弃）、
@@ -173,7 +173,7 @@ my-agent/
       父 agent 用自己的话转述）。真机抓到预算问题：裸减半 8→4 饿死 explore，
       修复为 max(6, parent//2) 保底
 
-### 循环护甲（二期）✅ 2026-10-28（测试 87 绿，待真机验收）
+### 循环护甲（二期）✅ 2026-10-28（测试 87 绿，真机验收过）
 - [x] 空响应重试：模型返回空时注入"请明确回复"再问一次（对齐 CowAgent
       agent_stream.py 1027~1076），用完 pop 不进历史；重试给 tool_calls 落回工具路径；
       SIMPLIFIED: 砍 allow_empty_response（定时任务专用）
@@ -182,8 +182,8 @@ my-agent/
 - [x] 模型 fallback：config "fallback_model"（默认关）；主模型抛错 → run 内粘性
       切备用重试一次；create_bot(model=...) 支持覆盖（自有设计，非 CowAgent 蓝图）
 - [x] 顺手修测试污染：工厂测试不再假设真机 config（env 钉死，同 env 字符串同族教训）
-- [ ] **真机验收**：长任务中途 Ctrl+C → 中断提示 + 下一句还能聊；
-      fallback_model 填上 + model 故意改错 → 出切换提示且正常回答
+- [x] **真机验收** ✅ 2026-10-28：长任务中途 Ctrl+C → 中断提示 + 下一句还能聊 ✅；
+      fallback_model 填上 + model 故意改错 → 出切换提示且正常回答 ✅
 
 ### P2 阶段：多 agent ✅ 2026-10-28（测试 109 绿，待真机验收）
 > 多 agent = N 次单 agent 装配 + 花名册 + 派单 + 信箱。
