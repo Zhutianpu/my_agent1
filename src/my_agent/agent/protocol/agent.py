@@ -13,9 +13,10 @@ from ...bridge.reply import Reply, ReplyType
 from ...common import const
 from ...common.log import logger
 from ...config import conf
-from ...models.session_manager import SESSIONS
+from ...models.session_manager import SESSIONS, estimate_text_tokens
 from .. import mailbox
 from .loop import run_loop
+from .overflow import ContextOverflowError, overflow_budget, proactive_budget
 
 # P2 在跑栈：当前线程正在运行的 (agent_id, session_id)，嵌套 run 时逐层压入。
 # 用途一：agent_delegate 拒绝派单给"正在干活的 agent"（否则两个 run 共用
@@ -71,7 +72,12 @@ class Agent:
             query = mailbox.format_mails(mails) + "用户的消息：" + query
 
         session.add_query(query)
-        discarded = session.discard_exceeding()  # 循环外只裁一次；裁掉的去蒸馏
+        discarded = session.discard_exceeding()  # 第一把尺：条数
+        # 护甲三期主动道：第二把尺 token（条数是代理指标，一条消息 10 token
+        # 或 2000 token 都可能）。裁掉的一样去蒸馏。
+        sys_tokens = estimate_text_tokens(session.system_prompt)
+        tok_discarded, _ = session.discard_over_tokens(proactive_budget(sys_tokens))
+        discarded += tok_discarded
 
         # 7b：裁剪即蒸馏——必须在循环前做（对齐 CowAgent 的时机）。
         # 真机教训：曾在回复后才蒸馏，结果"刚写完周报、上下文被裁、用户回复时
@@ -98,6 +104,40 @@ class Agent:
             self._save(session)
             on_event({"type": "agent_end", "data": {}})
             return Reply(ReplyType.TEXT, "（这轮执行被中断）")
+        except ContextOverflowError as e:
+            # 护甲三期被动道：报错即数据源——抠真实预算 → 照它裁（边界安全，
+            # 裁掉的照样蒸馏保命）→ 只重试一次（CowAgent 记的 LinkAI 教训：
+            # 蒙着砍一半会"压→还超→再压→再撞"锤打死循环）。
+            logger.warning(f"[Agent] 上下文溢出，压缩重试: {e}")
+            discarded, fits = session.discard_over_tokens(
+                overflow_budget(str(e), sys_tokens))
+            if discarded and self.memory:
+                summary = self.memory.flush(discarded)
+                if summary:
+                    session.inject_summary(summary)
+            if fits:
+                on_event({"type": "notice", "data": {
+                    "text": "（上下文撞墙：已压缩历史+蒸馏，重试一次）"}})
+                try:
+                    text = run_loop(
+                        bot=self.bot, session=session,
+                        on_event=on_event, max_turns=self.max_turns,
+                        tools=self.tools,
+                    )
+                except ContextOverflowError:
+                    fits = False  # 压缩后还撞 → 放弃，走清空兜底
+            if not fits:
+                # 压不动：清内存（reset 重建 system 头），不落盘——磁盘历史保住。
+                # SIMPLIFIED：jsonl 整写意味着下次成功保存仍会覆盖磁盘历史；
+                # CowAgent 的 SQLite 才谈得上真正长期保留。单用户场景
+                # "请重新描述需求"已够兜底。
+                session.reset()
+                on_event({"type": "notice", "data": {
+                    "text": "（上下文实在塞不下，已清空内存对话）"}})
+                on_event({"type": "agent_end", "data": {}})
+                return Reply(ReplyType.TEXT,
+                             "上下文实在塞不下了：我已清空内存里的对话（本轮不落盘，磁盘历史保留）。"
+                             "请重新描述你的需求。")
         except Exception as e:
             logger.exception("[Agent] 循环异常")
             on_event({"type": "error", "data": {"error": str(e)}})

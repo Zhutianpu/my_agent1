@@ -25,6 +25,20 @@ def _session_file(agent_id, session_id) -> Path:
     return ROOT / "workspaces" / agent_id / "sessions" / f"{sid}.jsonl"
 
 
+def estimate_text_tokens(text: str) -> int:
+    """token 粗算（对齐 CowAgent _estimate_text_tokens）：CJK ×1.5，ASCII ÷4。
+
+    估算不怕糙——主动道有 20% 输出预留，被动道有 10% 余量 +
+    报错里的真实数字兜底。SIMPLIFIED：CowAgent 还给 tool_use/tool_result
+    块加 +50/+30 结构开销、图片固定 1200；我们的 content 是纯字符串，
+    结构开销只在 Session.estimate_tokens 里对 tool_calls 加一次。
+    """
+    if not text:
+        return 0
+    non_ascii = sum(1 for c in text if ord(c) > 127)
+    return int(non_ascii * 1.5 + (len(text) - non_ascii) * 0.25) + 1
+
+
 class Session:
     def __init__(self, session_id, agent_id=const.DEFAULT_AGENT_ID, system_prompt=None):
         self.session_id = session_id
@@ -95,6 +109,77 @@ class Session:
         discarded = self.messages[head:start]
         self.messages = self.messages[:head] + self.messages[start:]
         return discarded
+
+    # ---- 护甲三期：token 预算裁剪（条数之外的第二把尺子） ----
+
+    _OLD_TOOL_RESULT_CHARS = 500  # 老轮次工具结果截断到这个数（写入上限 6000 对历史太松）
+    _TRUNC_MARK = "…（历史工具结果已截断）"
+
+    def estimate_tokens(self) -> int:
+        """整本历史的粗算。system 头群不计——它在预算公式里单独减
+        （对齐 CowAgent：budget = window − reserve − system_tokens，
+        再拿来和轮次 token 比）。"""
+        total = 0
+        for m in self.messages:
+            if m.get("role") == "system":
+                continue
+            c = m.get("content")
+            if isinstance(c, str):
+                total += estimate_text_tokens(c)
+            tcs = m.get("tool_calls")
+            if tcs:  # 工具订单：JSON 参数 + 结构开销
+                total += estimate_text_tokens(json.dumps(tcs, ensure_ascii=False)) + 50
+        return total
+
+    def _truncate_old_tool_results(self):
+        """老轮次的 tool 结果截断（最后一轮不动——模型可能还要引用）。
+        对齐 CowAgent _trim_messages Step 0（30K→10K）：整轮丢之前，
+        先把能省的都省了。"""
+        last_user = 0
+        for i in range(len(self.messages) - 1, -1, -1):
+            if self.messages[i].get("role") == "user":
+                last_user = i
+                break
+        for m in self.messages[:last_user]:
+            if m.get("role") == "tool":
+                c = m.get("content") or ""
+                if len(c) > self._OLD_TOOL_RESULT_CHARS:
+                    m["content"] = c[:self._OLD_TOOL_RESULT_CHARS] + self._TRUNC_MARK
+
+    def _discard_oldest_turn(self) -> list:
+        """按 user 边界丢最老一轮（system 头群和最后一轮永远不动——
+        用户刚说的话不能丢，CowAgent 同款）。返回被丢的消息，无可丢返回 []。"""
+        head = 0
+        while head < len(self.messages) and self.messages[head].get("role") == "system":
+            head += 1
+        users = [i for i in range(head, len(self.messages))
+                 if self.messages[i].get("role") == "user"]
+        if len(users) <= 1:
+            return []
+        cut = users[1]  # 第二轮开始的地方 = 第一轮的结束
+        batch = self.messages[head:cut]
+        self.messages = self.messages[:head] + self.messages[cut:]
+        return batch
+
+    def discard_over_tokens(self, budget: int):
+        """token 预算裁剪（对齐 _trim_messages Step 0/3 + _smart_compact_to_budget
+        的循环压缩，合成一个入口）。裁剪即蒸馏的触发点不变：返回 (被丢的消息, 是否达标)。
+
+        fits=False 时消息可能已截断/已丢但仍超（比如只剩一轮巨物）——
+        被丢的部分照样返回给调用方蒸馏（CowAgent 压不动前也先 flush 保命）。
+        """
+        if self.estimate_tokens() <= budget:
+            return [], True
+        self._truncate_old_tool_results()
+        discarded = []
+        guard = 0
+        while self.estimate_tokens() > budget and guard < 32:  # guard 上限对齐 CowAgent
+            guard += 1
+            batch = self._discard_oldest_turn()
+            if not batch:
+                break  # 只剩最后一轮——不能再丢
+            discarded.extend(batch)
+        return discarded, self.estimate_tokens() <= budget
 
 
 class SessionManager:

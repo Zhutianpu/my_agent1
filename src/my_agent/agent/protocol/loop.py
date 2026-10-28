@@ -23,6 +23,7 @@
 from ...common.log import logger
 from ...config import conf
 from ..tools.tool_manager import TOOLS
+from .overflow import ContextOverflowError, is_context_overflow
 
 _EXPLICIT_RESPONSE_PROMPT = "请向用户说明刚才工具执行的结果或回答用户的问题。"
 _EMPTY_FALLBACK = "抱歉，我暂时无法生成回复。请尝试换一种方式描述你的需求，或稍后再试。"
@@ -45,6 +46,10 @@ def run_loop(*, bot, session, on_event, max_turns: int, tools=None) -> str:
         except KeyboardInterrupt:
             raise  # 取消不是"模型失败"，别触发 fallback
         except Exception as e:
+            # 护甲三期：溢出抢在 fallback 之前判——换模型救不了溢出
+            # （同样的上下文换谁照样撞），抛专用异常让 agent 层压缩重试
+            if is_context_overflow(str(e)):
+                raise ContextOverflowError(str(e)) from e
             fallback_model = conf().get("fallback_model", "")
             if not fallback_model:
                 raise
@@ -53,7 +58,12 @@ def run_loop(*, bot, session, on_event, max_turns: int, tools=None) -> str:
                 "text": f"⚠️ 主模型调用失败，本轮起切换到备用模型 {fallback_model}"}})
             from ...models.bot_factory import create_bot  # 局部 import 破环
             bot = create_bot(model=fallback_model)
-            return bot.chat(session.messages, tools=tools_schema or None, on_delta=on_delta)
+            try:
+                return bot.chat(session.messages, tools=tools_schema or None, on_delta=on_delta)
+            except Exception as e2:
+                if is_context_overflow(str(e2)):
+                    raise ContextOverflowError(str(e2)) from e2
+                raise
 
     def interrupted():
         """取消的统一收尾：通知 + 补一条 assistant 回复（历史保持一问一答）。"""
@@ -80,9 +90,11 @@ def run_loop(*, bot, session, on_event, max_turns: int, tools=None) -> str:
                 try:
                     resp = chat()
                 except KeyboardInterrupt:
-                    session.messages.pop(idx)
                     return interrupted()
-                session.messages.pop(idx)
+                finally:
+                    # 用完 pop——催促是临时工。放 finally：溢出等异常路径也要 pop，
+                    # 否则这条假 user 消息留在历史里，被动道压缩时算进账
+                    session.messages.pop(idx)
                 text = resp.content or ""
             if not resp.tool_calls:  # 第 5 步：真收工（含首轮即空 / 重试仍空）
                 if not text:

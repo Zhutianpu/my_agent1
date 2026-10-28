@@ -185,7 +185,26 @@ my-agent/
 - [x] **真机验收** ✅ 2026-10-28：长任务中途 Ctrl+C → 中断提示 + 下一句还能聊 ✅；
       fallback_model 填上 + model 故意改错 → 出切换提示且正常回答 ✅
 
-### P2 阶段：多 agent ✅ 2026-10-28（测试 109 绿，待真机验收）
+### 循环护甲（三期）：上下文溢出恢复 ✅ 2026-10-28（测试 125 绿，待真机验收）
+> 对齐 agent_stream.py 被动道（_overflow_input_budget :2605 /
+> _smart_compact_to_budget :2632 / 只重试一次 :1874）+ _trim_messages :2785。
+> 笔记：learning/loop-armor.md 三期段。至此"我的 agent 怎么不死"叙事完整。
+
+- [x] overflow.py：判型（11 标记 + OpenAI 下划线错误码超集）+
+      报错抠真实预算（两正则 + ×0.9 余量）+ 主动预算（窗口×0.8 − system）
+- [x] token 估算（CJK ×1.5 / ASCII ÷4，对齐 _estimate_text_tokens）+
+      Session.discard_over_tokens：先截断老工具结果（6000→500），
+      不够再按 user 边界整轮丢；最后一轮永远保留
+- [x] 被动道接线：loop 判型抛 ContextOverflowError **抢在 fallback 前**
+      （换模型救不了溢出）→ agent 压缩+蒸馏+只重试一次 →
+      压不动清内存保磁盘，"请重新描述需求"
+- [x] 顺手修：空响应催促注入改 finally pop（异常路径不留假 user 消息）
+- [x] SIMPLIFIED：窗口回退一级（config model_context_window 默认 128000）、
+      无图片/块结构估算、清内存后下次成功保存仍覆盖磁盘（jsonl 整写）
+- [ ] **真机验收**：config 塞小 window 看主动道裁剪+蒸馏不断片；
+      被动道靠离线测试担保（真 overflow 烧 64K+ token 不值当）
+
+### P2 阶段：多 agent ✅ 2026-10-28（测试 110 绿，真机验收过）
 > 多 agent = N 次单 agent 装配 + 花名册 + 派单 + 信箱。
 > 参照：registry.py（花名册）/ routing.py（路由）/
 > multiagent/transport.py（信箱）/ tools/agent_delegate（委托工具，719 行）。
