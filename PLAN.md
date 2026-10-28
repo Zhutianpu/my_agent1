@@ -185,7 +185,7 @@ my-agent/
 - [x] **真机验收** ✅ 2026-10-28：长任务中途 Ctrl+C → 中断提示 + 下一句还能聊 ✅；
       fallback_model 填上 + model 故意改错 → 出切换提示且正常回答 ✅
 
-### 循环护甲（三期）：上下文溢出恢复 ✅ 2026-10-28（测试 125 绿，待真机验收）
+### 循环护甲（三期）：上下文溢出恢复 ✅ 2026-10-28（测试 125 绿，真机验收过）
 > 对齐 agent_stream.py 被动道（_overflow_input_budget :2605 /
 > _smart_compact_to_budget :2632 / 只重试一次 :1874）+ _trim_messages :2785。
 > 笔记：learning/loop-armor.md 三期段。至此"我的 agent 怎么不死"叙事完整。
@@ -201,8 +201,9 @@ my-agent/
 - [x] 顺手修：空响应催促注入改 finally pop（异常路径不留假 user 消息）
 - [x] SIMPLIFIED：窗口回退一级（config model_context_window 默认 128000）、
       无图片/块结构估算、清内存后下次成功保存仍覆盖磁盘（jsonl 整写）
-- [ ] **真机验收**：config 塞小 window 看主动道裁剪+蒸馏不断片；
-      被动道靠离线测试担保（真 overflow 烧 64K+ token 不值当）
+- [x] **真机验收** ✅ 2026-10-28：config window=2000 → 主动道触发蒸馏（14 条→
+      2026-10-28.md），prompt 6289→4601，摘要注回后模型引用蒸馏内容继续对话；
+      被动道离线测试担保（provider 真实报错样本）
 
 ### P2 阶段：多 agent ✅ 2026-10-28（测试 110 绿，真机验收过）
 > 多 agent = N 次单 agent 装配 + 花名册 + 派单 + 信箱。
