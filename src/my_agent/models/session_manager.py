@@ -72,6 +72,16 @@ class Session:
     # 蒸馏摘要注回消息的固定标记（inject_summary / discard_exceeding 都认它）
     SUMMARY_MARK = "【早前对话的蒸馏摘要】"
 
+    def get_summary(self) -> str:
+        """读当前摘要注回的内容（不含标记行），没有返回 ""。
+
+        滚动蒸馏用：旧摘要要并入下一批蒸馏输入（agent.py 蒸馏段），
+        否则摘要是"单代容器"——每批一换，早期事实活不过两代。"""
+        if len(self.messages) > 1 and self.messages[1].get("role") == "system" \
+                and str(self.messages[1].get("content", "")).startswith(self.SUMMARY_MARK):
+            return self.messages[1]["content"][len(self.SUMMARY_MARK):].strip()
+        return ""
+
     def inject_summary(self, summary: str):
         """把蒸馏摘要作为 system 消息注回到头部（紧跟编译 prompt 之后）。
         已存在就替换（摘要随蒸馏滚动更新，不堆积）。

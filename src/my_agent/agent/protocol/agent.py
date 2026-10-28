@@ -84,6 +84,14 @@ class Agent:
         # 模型当场失忆"。摘要注回活上下文（context_summary_callback 同款），
         # 模型这轮就能看见"早前聊了什么的浓缩版"。
         if discarded and self.memory:
+            # 滚动蒸馏：旧摘要并入当批输入——否则摘要是"单代容器"，每批一换，
+            # 早期事实活不过两代（50 轮召回评估实测 0/10 抓到的缺陷）。
+            # CowAgent 靠"摘要是普通消息、随下批裁剪回流"实现累计；
+            # 我们注回受保护不进场，改从蒸馏输入侧并入，效果相同且注回不掉线。
+            old_summary = session.get_summary()
+            if old_summary:
+                discarded = [{"role": "user", "content":
+                              f"（此前的蒸馏摘要，请与下面新内容合并浓缩）\n{old_summary}"}] + discarded
             summary = self.memory.flush(discarded)
             if summary:
                 session.inject_summary(summary)

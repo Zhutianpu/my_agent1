@@ -27,7 +27,9 @@ def build_system_prompt(
     context_files: Optional[List[ContextFile]] = None,
     runtime_info: Optional[Dict[str, Any]] = None,
     identity_fallback: str = "",
-    memory_digest: str = "",          # 阶段 7：最近日记摘要
+    # 阶段 7：None = 无记忆系统（裸 Agent/测试，整段不出现——否则模型会幻觉调用
+    # 不存在的 memory_search）；"" = 有记忆系统但今天还没日记（教育在、摘要不在）
+    memory_digest: Optional[str] = None,
     skill_manager=None,               # 阶段 8：技能清单（有 build_skills_prompt() 就行）
 ) -> str:
     """分段编译 system prompt。每段由原料是否存在决定（存在即编译）。"""
@@ -46,8 +48,11 @@ def build_system_prompt(
         sections.append(_workspace_section(
             runtime_info["workspace_dir"], runtime_info.get("cwd", "")))
 
-    # 3. 记忆段（阶段 7）：最近日记摘要 + memory_search 用法提示
-    if memory_digest:
+    # 3. 记忆段（阶段 7）：能力门控不对内容门控——召回路径的教育必须在，
+    # 否则日记为空时模型学不到"可以搜记忆"，问过去的事搜不搜成抛硬币
+    # （50 轮召回评估实测 A 层 0→9→0 摆动抓到的；对齐 CowAgent 的
+    #  if memory_manager: 门控 + "Memory Recall (mandatory)" 教育）。
+    if memory_digest is not None:
         sections.append(_memory_section(memory_digest))
 
     # 3.5. 技能段（阶段 8）：描述清单 + 使用纪律（正文不进 prompt，模型按需读）
@@ -105,14 +110,24 @@ def _workspace_section(workspace_dir: str, cwd: str = "") -> str:
 
 
 def _memory_section(digest: str) -> str:
-    return "\n".join([
-        "## 🧠 最近记忆",
+    # 教育部分无条件在（这是召回路径说明书）；digest 数据有料才附。
+    # 对齐 CowAgent "Memory Recall (mandatory)"，极简成两句。
+    lines = [
+        "## 🧠 记忆系统",
         "",
-        "以下是最近日记的摘要（更早的记忆用 memory_search 工具检索；",
-        "重要但已过时的内容会在 #dream 后沉淀进 MEMORY.md）：",
-        "",
-        digest,
-    ])
+        "当用户问起过去的事（偏好、决定、待办、之前说过的信息），先用 memory_search "
+        "检索再回答——早前的对话可能已蒸馏进日记，不在当前上下文里。",
+        "搜不到就如实说没有记录，不要凭印象编造。",
+    ]
+    if digest:
+        lines += [
+            "",
+            "以下是最近日记的摘要（更早的记忆用 memory_search 检索；",
+            "重要但已过时的内容会在 #dream 后沉淀进 MEMORY.md）：",
+            "",
+            digest,
+        ]
+    return "\n".join(lines)
 
 
 def _skills_section(skills_prompt: str) -> str:

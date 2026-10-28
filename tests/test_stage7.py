@@ -145,6 +145,24 @@ def test_summary_note_survives_trim():
     assert session.messages[2]["role"] == "user"
 
 
+def test_summary_rolls_up_across_generations(tmp_path, monkeypatch):
+    """滚动蒸馏：第二代蒸馏的输入必须含第一代摘要——否则早期事实只活一代。
+
+    50 轮召回评估实测 0/10 抓到的缺陷：旧摘要受保护不进裁剪队列，
+    被新摘要整体替换后内容蒸发。修复：flush 输入 = 旧摘要 + 当批消息。
+    预算=4 时第三、四轮各触发一次裁剪蒸馏。"""
+    monkeypatch.setenv("CONVERSATION_MAX_MESSAGES", "4")
+    bot = ScriptedBot(["回答1", "回答2", "- 第一代要点", "回答3", "- 第二代要点", "回答4"])
+    agent = Agent(bot=bot, memory=MemoryManager(tmp_path, bot))
+    ctx = lambda: Context(kwargs={"session_id": "rollup7"})
+    for i in range(1, 5):
+        agent.run(f"问题{i}", ctx())
+    # seen[2]=第一次蒸馏，seen[4]=第二次蒸馏：输入里必须带着第一代摘要
+    assert "第一代要点" in str(bot.seen[4])
+    diary = next((tmp_path / "memory").glob("*.md")).read_text(encoding="utf-8")
+    assert "第一代要点" in diary and "第二代要点" in diary
+
+
 # ---------- 7c 检索 ----------
 
 def test_chunker_overlap():
@@ -177,6 +195,10 @@ def test_memory_search_tool(tmp_path):
 
 
 def test_builder_memory_section_gated():
-    assert "最近记忆" not in build_system_prompt()
+    """记忆段是能力门控不是内容门控（对齐 CowAgent if memory_manager:）：
+    None=无记忆系统整段不出现（防幻觉调用）；""=有系统无日记，教育在摘要不在。"""
+    assert "记忆系统" not in build_system_prompt()
+    p = build_system_prompt(memory_digest="")
+    assert "记忆系统" in p and "memory_search" in p and "日记的摘要" not in p
     p = build_system_prompt(memory_digest="- 用户喜欢喝茶")
-    assert "最近记忆" in p and "用户喜欢喝茶" in p and "memory_search" in p
+    assert "记忆系统" in p and "用户喜欢喝茶" in p and "memory_search" in p
