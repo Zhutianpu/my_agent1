@@ -16,13 +16,17 @@ from .loop import run_loop
 
 
 class Agent:
-    def __init__(self, bot, system_prompt: str = "", max_turns: int = None, memory=None):
+    def __init__(self, bot, system_prompt: str = "", max_turns: int = None, memory=None,
+                 tools=None, persist_session: bool = True):
         self.bot = bot
         # 编译好的 system prompt（阶段 5：由 initializer 装配时注入；
         # 直接 new Agent(bot) 的测试/旧代码没有它，session 退回配置的 character_desc）
         self.system_prompt = system_prompt
         self.max_turns = max_turns or int(conf().get("agent_max_turns", 8))
         self.memory = memory  # 阶段 7：蒸馏线（None = 无记忆，测试/旧代码路径）
+        # 阶段 11 子代理两件套：
+        self.tools = tools  # 裁剪后的工具注册表（None = 全局 TOOLS）
+        self.persist_session = persist_session  # False = 用完即弃，不落盘
 
     def run(self, query: str, context: Context = None) -> Reply:
         session_id = context.get("session_id") if context else None
@@ -48,6 +52,7 @@ class Agent:
             text = run_loop(
                 bot=self.bot, session=session,
                 on_event=on_event, max_turns=self.max_turns,
+                tools=self.tools,
             )
         except KeyboardInterrupt:
             # 护甲二期：中断发生在循环外（罕见，比如蒸馏时按了 Ctrl+C）。
@@ -55,14 +60,19 @@ class Agent:
             logger.warning("[Agent] 运行被中断（循环外）")
             on_event({"type": "notice", "data": {"text": "（这轮执行被中断）"}})
             session.add_reply("（这轮执行被中断）")  # 保持一问一答
-            SESSIONS.save_session(session)
+            self._save(session)
             on_event({"type": "agent_end", "data": {}})
             return Reply(ReplyType.TEXT, "（这轮执行被中断）")
         except Exception as e:
             logger.exception("[Agent] 循环异常")
             on_event({"type": "error", "data": {"error": str(e)}})
-            SESSIONS.save_session(session)  # 炸了也要保住历史
+            self._save(session)  # 炸了也要保住历史
             return Reply(ReplyType.ERROR, f"出错了: {e}")
         on_event({"type": "agent_end", "data": {}})
-        SESSIONS.save_session(session)  # 7a：落盘
+        self._save(session)  # 7a：落盘
         return Reply(ReplyType.TEXT, text)
+
+    def _save(self, session):
+        """落盘（子代理的弃置 session 跳过：它的历史只属于这次派单）。"""
+        if self.persist_session:
+            SESSIONS.save_session(session)

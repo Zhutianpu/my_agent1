@@ -7,6 +7,7 @@ from .ls import LsTool
 from .memory_search import MemorySearchTool
 from .read import ReadFileTool
 from .search_files import SearchFilesTool
+from .subagent_tool import SubagentTool
 from .tool_manager import TOOLS
 from .write import WriteFileTool
 
@@ -18,3 +19,4 @@ TOOLS.register(RunCommandTool)
 TOOLS.register(SearchFilesTool)
 TOOLS.register(CurrentTimeTool)
 TOOLS.register(MemorySearchTool)
+TOOLS.register(SubagentTool)  # 阶段 11：派发工具（子代理的白名单里没有它——铁律）

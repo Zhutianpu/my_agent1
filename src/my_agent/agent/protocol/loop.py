@@ -30,8 +30,10 @@ _INTERRUPT_NOTE = "（⚠️ 这轮执行被 Ctrl+C 中断）"
 _INTERRUPT_TOOL_RESULT = "（执行被用户中断）"
 
 
-def run_loop(*, bot, session, on_event, max_turns: int) -> str:
-    tools_schema = TOOLS.schemas()
+def run_loop(*, bot, session, on_event, max_turns: int, tools=None) -> str:
+    # tools：阶段 11 的缝——子代理跑裁剪后的白名单注册表；None = 全局 TOOLS
+    registry = tools or TOOLS
+    tools_schema = registry.schemas()
     on_delta = lambda d: on_event({"type": "message_update", "data": {"delta": d}})
 
     def chat():
@@ -111,7 +113,7 @@ def run_loop(*, bot, session, on_event, max_turns: int) -> str:
             on_event({"type": "tool_execution_start", "data": {
                 "tool_name": tc["name"], "arguments": tc["arguments"]}})
             try:
-                result = TOOLS.execute(tc["name"], tc["arguments"])
+                result = registry.execute(tc["name"], tc["arguments"])
             except KeyboardInterrupt:
                 was_interrupted = True
                 session.messages.append({

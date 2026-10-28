@@ -69,7 +69,7 @@ my-agent/
 
 ## 待做（按依赖顺序）
 
-### 阶段 5：prompt builder + workspace + 装配间 ✅ 2026-10-27（测试 33 绿，待真机验收）
+### 阶段 5：prompt builder + workspace + 装配间 ✅ 2026-10-27（测试 33 绿，真机验收过）
 > 对齐 CowAgent `agent/prompt/builder.py` + `agent/workspace` + `bridge/agent_initializer.py`
 
 - [x] workspace：`workspaces/<agent_id>/` 目录（P2 的缝落地），内置模板文件
@@ -80,9 +80,9 @@ my-agent/
 - [x] agent/initializer.py：装配间独立（备料→编译→总装），签名 `agent_id=None`（P2 的缝）
 - [x] 补两个工具：edit_file（精确替换，唯一性校验）+ current_time
 - [x] Agent 注入编译后 prompt，每次 run 刷新 session 第 0 条；#reset 连 agent 一起重装
-- [ ] **真机验收**：改 AGENT.md 后 #reset，agent 自我认知变化；workspaces/default/ 目录生成
+- [x] **真机验收**：改 AGENT.md 后 #reset，agent 自我认知变化；workspaces/default/ 目录生成 ✅
 
-### 阶段 6：permission 权限闸 ✅ 2026-10-27（测试 41 绿，待真机验收）
+### 阶段 6：permission 权限闸 ✅ 2026-10-27（测试 41 绿，真机验收过）
 > 对齐 CowAgent `agent/permission`，交互式简化（静态政策闸 982 行 → 交互闸 ~80 行）
 
 - [x] Decision(allowed, reason) 契约照搬；工具自报风险级（BaseTool.risk：
@@ -91,9 +91,10 @@ my-agent/
 - [x] 拒绝变错误文本回填模型（D004 延伸，同构 CowAgent _permission_denial）
 - [x] 审计进 run.log；闸挂在 ToolManager.execute 必经之路，loop 一行不改；
       handler 由 channel 注入（headless 无 handler = 放行，web 阶段换异步）
-- [ ] **真机验收**：agent 要写文件时先问你；a 后同类不再问；n 后模型换方案
+- [x] **真机验收**：agent 要写文件时先问你；a 后同类不再问；n 后模型换方案 ✅
+      （阶段 8 周报场景 + 阶段 11 子代理写文件场景两次验证）
 
-### 阶段 7：memory（CowAgent 版）✅ 7a/7b/7c 2026-10-27（测试 52 绿，待真机验收）
+### 阶段 7：memory（CowAgent 版）✅ 7a/7b/7c 2026-10-27（测试 52 绿，真机验收过）
 > 对齐 `agent/memory/`：记忆是可检索的，蒸馏是流水线，向量可降级
 
 - [x] 7a 会话持久化：jsonl 落盘（workspaces/<agent_id>/sessions/，整写），启动恢复，
@@ -106,8 +107,9 @@ my-agent/
       （阶段 5 builder 坑位兑现，builder 本体未改结构）
 - [ ] 7d（可选，未做）向量增强：搬 offer-coach embedder
 - [ ] 不做：deep_dream 定时器、知识图谱、hit_boost 调参
-- [ ] **真机验收**：聊几轮 → 退出重开 → 历史还在；CONVERSATION_MAX_MESSAGES=8
-      聊十几轮 → memory/日期.md 出现；#dream → MEMORY.md 更新；问"我之前说过X" → 它用 memory_search
+- [x] **真机验收**：重开历史恢复 9 条 ✅；裁剪蒸馏出 memory/2026-10-27.md ✅；
+      #dream → MEMORY.md 更新 237 字符 ✅；问"我朋友叫什么" → 从 MEMORY.md 注入层
+      直接答出（分层设计：MEMORY.md 自动进 prompt，memory_search 管更老的日记）✅
 
 ### 阶段 8：skills ✅ 2026-10-27（测试全绿，真机验收过：写周报时自动读 SKILL.md 并按格式输出）
 > 对齐 `agent/skills/`（loader 361 + manager 519 → 简化到 ~120 行）
@@ -155,13 +157,21 @@ my-agent/
       （页面 200 / SSE 已连接 / 浏览器交互用户确认；三问第 3 条"只重写 channel/"兑现：
       agent 核心一行未改，事件流/权限闸注入点原样复用）
 
-### 阶段 11（可选）：subagent 子代理
-> 对齐 `agent/subagent` + `tools/subagent`；myself step9 经验；P2 多 agent 的跳板
+### 阶段 11：subagent 子代理 ✅ 2026-10-28（测试 97 绿，待真机验收）
+> 对齐 `agent/subagent` + `tools/subagent`；P2 多 agent 的跳板
 
-- [ ] subagent 工具：主 agent 派单，子代理独立 messages（上下文隔离）、跑完回总结
-- [ ] 工具白名单（ToolManager 按角色过滤——P2 的缝兑现）
-- [ ] 铁律：子代理拿不到 dispatch（防套娃）
-- [ ] **验收**："派 scout 查一下 X，派 builder 把结果写进文件"自动完成
+- [x] subagent 工具：主 agent 派单，子代理独立 session（用完即弃）、
+      无 memory 不落盘、跑完回总结——父上下文只见派单和结论
+- [x] 工具白名单：ToolManager.subset 按模板裁剪（P2 的缝兑现）；
+      内置 general-purpose（全工具）+ explore（只读）；权限闸子集自动继承
+- [x] 铁律：BLOCKED_TOOLS 扣死 subagent——子代理工具集里没有派单工具，
+      结构上不可能套娃（SIMPLIFIED：砍了 CowAgent 的深度计数双保险）
+- [x] 预算减半（max_turns = parent // 2）；SIMPLIFIED：顺序执行无并发超时、
+      无用户模板、无事件转播
+- [x] **真机验收**：派 explore 查 PLAN.md + 派 general-purpose 写 待办.txt ✅
+      （角色路由正确；子代理写文件权限闸照样弹——派单不是权限后门；
+      父 agent 用自己的话转述）。真机抓到预算问题：裸减半 8→4 饿死 explore，
+      修复为 max(6, parent//2) 保底
 
 ### 循环护甲（二期）✅ 2026-10-28（测试 87 绿，待真机验收）
 - [x] 空响应重试：模型返回空时注入"请明确回复"再问一次（对齐 CowAgent

@@ -29,6 +29,16 @@ class ToolManager:
     def get(self, name):
         return self._tools.get(name)
 
+    def subset(self, names) -> "ToolManager":
+        """裁剪出只含 names 的新注册表，工具实例共享（阶段 11 子代理白名单）。
+
+        P2 的缝兑现：多 agent/角色按白名单各拿各的工具集。execute 里的
+        权限闸是 ToolManager 级别的，子集自动继承——派单不能绕过权限。
+        """
+        sub = ToolManager()
+        sub._tools = {n: t for n, t in self._tools.items() if n in set(names)}
+        return sub
+
     def schemas(self) -> list:
         return [t.schema() for t in self._tools.values()]
 
