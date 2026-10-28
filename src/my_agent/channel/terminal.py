@@ -56,6 +56,12 @@ class TerminalRenderer:
         elif etype == "tool_execution_end":
             flag = "✓" if data.get("status") == "success" else "✗"
             print(f"  {flag} {data.get('tool_name')}")
+        elif etype == "notice":
+            # 系统旁白（护甲二期的中断/模型切换提示等）：换行后打印，不混进正文流
+            if self.streamed:
+                print()
+                self.streamed = False
+            print(f"  {data.get('text')}")
         elif etype == "error":
             print(f"\n  ❌ {data.get('error')}")
         elif etype == "agent_end":

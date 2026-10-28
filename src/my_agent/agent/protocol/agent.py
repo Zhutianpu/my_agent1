@@ -49,6 +49,15 @@ class Agent:
                 bot=self.bot, session=session,
                 on_event=on_event, max_turns=self.max_turns,
             )
+        except KeyboardInterrupt:
+            # 护甲二期：中断发生在循环外（罕见，比如蒸馏时按了 Ctrl+C）。
+            # 循环内的中断 loop 自己接住并正常返回了。这里兜住 = 应用不死。
+            logger.warning("[Agent] 运行被中断（循环外）")
+            on_event({"type": "notice", "data": {"text": "（这轮执行被中断）"}})
+            session.add_reply("（这轮执行被中断）")  # 保持一问一答
+            SESSIONS.save_session(session)
+            on_event({"type": "agent_end", "data": {}})
+            return Reply(ReplyType.TEXT, "（这轮执行被中断）")
         except Exception as e:
             logger.exception("[Agent] 循环异常")
             on_event({"type": "error", "data": {"error": str(e)}})

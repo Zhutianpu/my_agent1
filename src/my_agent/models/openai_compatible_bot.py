@@ -13,8 +13,10 @@ from .bot import Bot, BotResponse
 
 
 class OpenAICompatibleBot(Bot):
-    def __init__(self):
-        self.model = conf().get("model")
+    def __init__(self, model: str = None):
+        # model 参数：护甲二期的 fallback 用——主模型挂了换备用，
+        # 其他配置（key/base）不变，只换模型名。
+        self.model = model or conf().get("model")
         self.client = OpenAI(
             api_key=conf().get("open_ai_api_key"),
             base_url=conf().get("open_ai_api_base"),
@@ -24,6 +26,9 @@ class OpenAICompatibleBot(Bot):
         kwargs = {
             "model": self.model,
             "messages": messages,
+            # agent 场景要确定性：工具调用是格式敏感的机器指令，不是文学创作。
+            # float() 防 env 覆盖进来是字符串（07-memory.md 记过的坑）。
+            "temperature": float(conf().get("temperature", 0)),
             "stream": True,
             "stream_options": {"include_usage": True},
         }

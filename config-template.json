@@ -8,5 +8,6 @@
     "character_desc": "你是 my-agent，一个通用个人助手。",
     "conversation_max_messages": 40,
     "agent_max_turns": 8,
-    "tool_result_max_chars": 6000
+    "tool_result_max_chars": 6000,
+    "fallback_model": ""
 }

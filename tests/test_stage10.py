@@ -65,7 +65,10 @@ def teardown_function():
 
 # ---------- channel 工厂 ----------
 
-def test_factory_default_terminal():
+def test_factory_terminal_via_config(monkeypatch):
+    # 教训：不能假设"默认 terminal"——真机 config.json 可能已改成 web。
+    # env 优先级高于 config.json，用它把配置钉死。
+    monkeypatch.setenv("CHANNEL", "terminal")
     assert isinstance(create_channel(), TerminalChannel)
 
 

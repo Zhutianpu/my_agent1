@@ -13,11 +13,11 @@ _BOT_TABLE = {
 }
 
 
-def create_bot(bot_type: str = None) -> Bot:
+def create_bot(bot_type: str = None, model: str = None) -> Bot:
     from ..config import conf
 
     btype = bot_type or conf().get("bot_type", const.OPENAI_COMPATIBLE)
     cls = _BOT_TABLE.get(btype)
     if cls is None:
         raise ValueError(f"未知 bot_type: {btype}（已登记的只有: {list(_BOT_TABLE)}）")
-    return cls()
+    return cls(model=model) if model else cls()

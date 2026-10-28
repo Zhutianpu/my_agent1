@@ -163,10 +163,17 @@ my-agent/
 - [ ] 铁律：子代理拿不到 dispatch（防套娃）
 - [ ] **验收**："派 scout 查一下 X，派 builder 把结果写进文件"自动完成
 
-### 循环护甲（二期，穿插在有空时）
-- [ ] 空响应重试：模型返回空时注入"请明确回复"再问一次（CowAgent 1027~1076 行），用完 pop
-- [ ] 取消：Ctrl+C 中止当前 run（KeyboardInterrupt 接进循环）
-- [ ] 模型 fallback：主模型持续失败时切备用（run 内粘性）
+### 循环护甲（二期）✅ 2026-10-28（测试 87 绿，待真机验收）
+- [x] 空响应重试：模型返回空时注入"请明确回复"再问一次（对齐 CowAgent
+      agent_stream.py 1027~1076），用完 pop 不进历史；重试给 tool_calls 落回工具路径；
+      SIMPLIFIED: 砍 allow_empty_response（定时任务专用）
+- [x] 取消：Ctrl+C 接进循环两层（loop 内接住正常返回 / agent.run 兜底不杀应用）；
+      中断补齐剩余 tool_call 的"已中断"结果（配对完整是 API 硬要求，cancel.py 同款）
+- [x] 模型 fallback：config "fallback_model"（默认关）；主模型抛错 → run 内粘性
+      切备用重试一次；create_bot(model=...) 支持覆盖（自有设计，非 CowAgent 蓝图）
+- [x] 顺手修测试污染：工厂测试不再假设真机 config（env 钉死，同 env 字符串同族教训）
+- [ ] **真机验收**：长任务中途 Ctrl+C → 中断提示 + 下一句还能聊；
+      fallback_model 填上 + model 故意改错 → 出切换提示且正常回答
 
 ### P2 阶段：多 agent
 多 agent = N 次单 agent 装配 + 花名册 + 派单 + 信箱。
