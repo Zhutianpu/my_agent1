@@ -6,13 +6,26 @@
   bot    —— 纯生成器，不认识这里发生的一切
 """
 
+import threading
+
 from ...bridge.context import Context
 from ...bridge.reply import Reply, ReplyType
 from ...common import const
 from ...common.log import logger
 from ...config import conf
 from ...models.session_manager import SESSIONS
+from .. import mailbox
 from .loop import run_loop
+
+# P2 在跑栈：当前线程正在运行的 (agent_id, session_id)，嵌套 run 时逐层压入。
+# 用途一：agent_delegate 拒绝派单给"正在干活的 agent"（否则两个 run 共用
+# 同一个 session 对象，历史当场绞麻花——CowAgent delegation_trace 的极简版）；
+# 用途二：工具里能查到"我是谁"（栈顶 = 调用者），留言/委托自动署名。
+_run_local = threading.local()
+
+
+def running_stack() -> list:
+    return list(getattr(_run_local, "stack", []))
 
 
 class Agent:
@@ -36,8 +49,27 @@ class Agent:
         agent_id = (context.get("agent_id") if context else None) or const.DEFAULT_AGENT_ID
         on_event = (context.get("on_event") if context else None) or (lambda e: None)
 
+        run_key = (agent_id, session_id or const.DEFAULT_SESSION_ID)
+        stack = running_stack()
+        stack.append(run_key)
+        _run_local.stack = stack
+        try:
+            return self._run_inner(query, session_id, agent_id, on_event)
+        finally:
+            stack = running_stack()
+            if run_key in stack:
+                stack.remove(run_key)
+            _run_local.stack = stack
+
+    def _run_inner(self, query: str, session_id, agent_id: str, on_event) -> Reply:
         session = SESSIONS.build_session(session_id, agent_id)
         session.set_system_prompt(self.system_prompt)  # 刷新第 0 条，历史不碰
+
+        # P2 信箱：上线先签收——留言并进本轮的用户消息，模型一次看全
+        mails = mailbox.drain(agent_id)
+        if mails:
+            query = mailbox.format_mails(mails) + "用户的消息：" + query
+
         session.add_query(query)
         discarded = session.discard_exceeding()  # 循环外只裁一次；裁掉的去蒸馏
 

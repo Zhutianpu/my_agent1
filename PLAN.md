@@ -185,12 +185,32 @@ my-agent/
 - [ ] **真机验收**：长任务中途 Ctrl+C → 中断提示 + 下一句还能聊；
       fallback_model 填上 + model 故意改错 → 出切换提示且正常回答
 
-### P2 阶段：多 agent
-多 agent = N 次单 agent 装配 + 花名册 + 派单 + 信箱。
-参照：registry.py（花名册）/ routing.py+team_addressing.py（派单）/
-multiagent/transport.py（信箱）/ tools/agent_delegate（委托工具）。
-四条缝已留：(agent_id,session_id) key ✅ / workspaces 分目录（阶段 5 落地）/
-initializer 签名（阶段 5 落地）/ 工具白名单（阶段 11 兑现）。
+### P2 阶段：多 agent ✅ 2026-10-28（测试 109 绿，待真机验收）
+> 多 agent = N 次单 agent 装配 + 花名册 + 派单 + 信箱。
+> 参照：registry.py（花名册）/ routing.py（路由）/
+> multiagent/transport.py（信箱）/ tools/agent_delegate（委托工具，719 行）。
+> 四条缝全部兑现：(agent_id,session_id) key / workspaces 分目录 /
+> initializer 签名 / 工具白名单。笔记：learning/12-multi-agent.md
+
+- [x] roster.py：config.json "agents" 列表 → AgentProfile(id/name/description)，
+      现读现生效，坏条目跳过；default 永远在册
+- [x] agent_delegate 工具：delegated_prompt 包装（来源署名 + "结果返回给委托方"）；
+      委托进对方**主会话**（记得住协作，#use 切过去能接着聊——与 subagent 用完即弃相对）
+- [x] 循环防护结构级：被派单者工具集摘 agent_delegate（阶段 11 同一招），
+      深度计数多余；补"在跑栈"拒派给正在干活的 agent（防自派单会话嵌套），
+      栈顶顺带当自动署名
+- [x] mailbox.py + agent_message 工具：jsonl 信箱，上线 drain 拼进本轮用户消息；
+      分工写进说明书（要结果 delegate / 知会 message）
+- [x] 终端路由：#agents 花名册 / #use <id> 切换（历史各自独立）；
+      #reset/#dream 改为对当前 agent 生效
+- [x] SIMPLIFIED：砍 workspace/model/skills 档案字段、max_depth/trace/三 mode、
+      socket 传输、并发派单、事件转播、channel 绑定路由
+- [x] **真机验收** ✅ 2026-10-28：派单+闸弹窗+转述 ✅ / #use 切换+主会话记忆
+      （builder 跨重启复述委托、主动提划掉旧待办）✅ / 工具自检 write_file 恢复 ✅
+      / 信箱收发+签收 ✅。真机抓 2 bug 并修复：① subset 生成器耗尽（set 写在
+      推导式 if 里每次迭代重求值，白名单裁到只剩 read_file——阶段 11 传 list
+      可重复消费潜伏三期；测试只有反向断言漏网，补正向断言）② 测试 drain 真机
+      信箱（conftest 加 mailbox 沙箱，污染家族第四员）
 
 ## 明确不复现（红线）
 

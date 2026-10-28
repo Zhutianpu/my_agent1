@@ -9,5 +9,6 @@
     "conversation_max_messages": 40,
     "agent_max_turns": 16,
     "tool_result_max_chars": 6000,
-    "fallback_model": ""
+    "fallback_model": "",
+    "agents": []
 }

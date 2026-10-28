@@ -35,8 +35,12 @@ class ToolManager:
         P2 的缝兑现：多 agent/角色按白名单各拿各的工具集。execute 里的
         权限闸是 ToolManager 级别的，子集自动继承——派单不能绕过权限。
         """
+        # set 必须提升出推导式（真机教训）：写在 if 子句里会每次迭代重新求值，
+        # names 是生成器时第一次就被消费光，后续迭代全部判空——
+        # 白名单当场裁到只剩第一个工具（P2 派单时 builder 只剩 read_file）。
+        allowed = set(names)
         sub = ToolManager()
-        sub._tools = {n: t for n, t in self._tools.items() if n in set(names)}
+        sub._tools = {n: t for n, t in self._tools.items() if n in allowed}
         return sub
 
     def schemas(self) -> list:

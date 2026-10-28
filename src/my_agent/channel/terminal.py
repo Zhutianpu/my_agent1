@@ -71,11 +71,13 @@ class TerminalRenderer:
 class TerminalChannel(ChatChannel):
     def __init__(self, session_id=const.DEFAULT_SESSION_ID):
         self.session_id = session_id
+        self.agent_id = const.DEFAULT_AGENT_ID  # P2：当前对话对象（#use 切换）
         self.renderer = TerminalRenderer()
 
     def startup(self):
         GATE.confirm_handler = _terminal_confirm  # 权限闸接上终端
-        print("my-agent 已启动。输入对话开始，#exit 退出，#reset 清空对话，#dream 沉淀记忆。\n")
+        print("my-agent 已启动。输入对话开始，#exit 退出，#reset 清空对话，#dream 沉淀记忆，"
+              "#agents 花名册，#use <id> 切换对话对象。\n")
         while True:
             try:
                 prompt = input("你: ").strip()
@@ -88,27 +90,48 @@ class TerminalChannel(ChatChannel):
                 print("再见。")
                 break
             if prompt == "#reset":
-                SESSIONS.clear_session(self.session_id)
+                SESSIONS.clear_session(self.session_id, self.agent_id)
                 # 连装配好的 agent 一起丢：下一条消息重新装配、重编 prompt。
                 # 改了 AGENT.md 想立即生效：改完打个 #reset。
                 from ..bridge.bridge import Bridge
-                Bridge().reset_agent()
-                print("（对话已清空，身份已重新装配）\n")
+                Bridge().reset_agent(self.agent_id)
+                print(f"（{self.agent_id} 的对话已清空，身份已重新装配）\n")
                 continue
             if prompt == "#dream":
                 # 阶段 7：手动触发"做梦"——最近日记蒸馏进 MEMORY.md
                 from ..bridge.bridge import Bridge
-                agent = Bridge().get_agent(const.DEFAULT_AGENT_ID)
+                agent = Bridge().get_agent(self.agent_id)
                 if agent.memory:
                     print(f"（🌙 dreaming...）")
                     print(agent.memory.dream(), "\n")
                 else:
                     print("（无记忆系统）\n")
                 continue
+            if prompt == "#agents":
+                # P2 花名册：现在能和谁说话、能把活派给谁
+                from ..agent.roster import load_roster
+                roster = load_roster()
+                print("花名册：")
+                for p in roster.values():
+                    marker = " ← 当前" if p.id == self.agent_id else ""
+                    print(f"  {p.id}（{p.name}）: {p.description or '（无描述）'}{marker}")
+                print()
+                continue
+            if prompt.startswith("#use "):
+                # P2 路由：换对话对象。历史各聊各的（(agent_id, session_id) 键）。
+                from ..agent.roster import load_roster
+                target = prompt[5:].strip()
+                roster = load_roster()
+                if target in roster:
+                    self.agent_id = target
+                    print(f"（已切换到 {target}（{roster[target].name}），对话历史各自独立）\n")
+                else:
+                    print(f"（花名册里没有 {target}，#agents 看在册名单）\n")
+                continue
             if prompt.startswith("#"):
                 # # 开头但不是已知命令：拦截提醒，不送给模型
                 # （真机抓到的 bug："#rest" typo 被当成"我要休息"发给了模型）
-                print(f"（未知命令 {prompt}，目前只有 #exit / #reset / #dream）\n")
+                print(f"（未知命令 {prompt}，目前只有 #exit / #reset / #dream / #agents / #use <id>）\n")
                 continue
 
             self.renderer = TerminalRenderer()  # 每轮新转播员，重置 streamed
@@ -117,7 +140,7 @@ class TerminalChannel(ChatChannel):
                 prompt,
                 kwargs={
                     "session_id": self.session_id,
-                    "agent_id": const.DEFAULT_AGENT_ID,  # P2 的缝
+                    "agent_id": self.agent_id,  # P2 兑现：#use 切到谁就聊谁
                     "on_event": self.renderer.handle_event,
                 },
             )
