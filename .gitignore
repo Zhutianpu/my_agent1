@@ -15,3 +15,6 @@ __pycache__/
 build/
 dist/
 .venv/
+
+# 面试准备材料，不进公开仓库
+learning/面试笔记.md
